@@ -145,7 +145,6 @@ func handleMsgMhfOperateGuild(s *Session, p mhfpacket.MHFPacket) {
 	case mhfpacket.OperateGuildDonateEvent:
 		quantity := uint16(pkt.Data1.ReadUint32())
 		bf.WriteBytes(handleDonateRP(s, quantity, guild, 1))
-		// TODO: Move this value onto rp_yesterday and reset to 0... daily?
 		if err := s.server.guildRepo.AddMemberDailyRP(s.charID, quantity); err != nil {
 			s.logger.Error("Failed to update guild character daily RP", zap.Error(err))
 		}

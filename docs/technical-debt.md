@@ -11,9 +11,8 @@ This document tracks actionable technical debt items discovered during a codebas
   - [2. Test gaps on critical paths](#2-test-gaps-on-critical-paths)
 - [Medium Priority](#medium-priority)
   - [3. Logging anti-patterns](#3-logging-anti-patterns)
-  - [4. Typos and stale comments](#4-typos-and-stale-comments)
 - [Low Priority](#low-priority)
-  - [5. CI updates](#5-ci-updates)
+  - [4. CI updates](#4-ci-updates)
 - [Completed Items](#completed-items)
 - [Suggested Execution Order](#suggested-execution-order)
 
@@ -27,10 +26,9 @@ These TODOs represent features that are visibly broken for players.
 
 | Location | Issue | Impact |
 |----------|-------|--------|
-| `model_character.go:88,101,113` | `TODO: fix bookshelf data pointer` for G10-ZZ, F4-F5, and S6 versions | Wrong pointer corrupts character save reads for three game versions |
-| `handlers_guild_ops.go:148` | `TODO: Move this value onto rp_yesterday and reset to 0... daily?` | Guild daily RP rollover logic is missing entirely |
-| `handlers_achievement.go:125` | `TODO: Notify on rank increase` — always returns `false` | Achievement rank-up notifications are silently suppressed |
-| `handlers_guild_info.go:443` | `TODO: Enable GuildAlliance applications` — hardcoded `true` | Guild alliance applications are always open regardless of setting |
+| `model_character.go:88,101,113` | `TODO: fix bookshelf data pointer` for G10-ZZ, F4-F5, and S6 versions | Wrong pointer corrupts character save reads for three game versions. Offset analysis shows all three are off by exactly 14810 vs the consistent delta pattern of other fields — but needs validation against actual save data. |
+| `handlers_achievement.go:125` | `TODO: Notify on rank increase` — always returns `false` | Achievement rank-up notifications are silently suppressed. Requires understanding what `MhfDisplayedAchievement` (currently an empty handler) sends to track "last displayed" state. |
+| `handlers_guild_info.go:443` | `TODO: Enable GuildAlliance applications` — hardcoded `true` | Guild alliance applications are always open regardless of setting. Needs research into where the toggle originates. |
 | `handlers_session.go:394` | `TODO(Andoryuuta): log key index off-by-one` | Known off-by-one in log key indexing is unresolved |
 | `handlers_session.go:535` | `TODO: This case might be <=G2` | Uncertain version detection in switch case |
 | `handlers_session.go:698` | `TODO: Retail returned the number of clients in quests` | Player count reported to clients does not match retail behavior |
@@ -65,21 +63,13 @@ These are validated indirectly through mock-based handler tests but have no SQL-
 
 ~~**b) 20+ silently discarded SJIS encoding errors in packet parsing:**~~ **Fixed.** All call sites now use `SJISToUTF8Lossy()` which logs decode errors at `slog.Debug` level.
 
-### 4. Typos and stale comments
-
-| Location | Issue |
-|----------|-------|
-| `sys_session.go:73` | Comment says "For Debuging" — typo ("Debugging"), and the field is used in production logging, not just debugging |
-| `handlers_session.go:394` | "offical" should be "official" |
-| `handlers_session.go:322` | `if s.server.db != nil` guard wraps repo calls — leaky abstraction from the pre-repository refactor |
-
 ---
 
 ## Low Priority
 
-### 5. CI updates
+### 4. CI updates
 
-- `codecov-action@v4` could be updated to `v5` (current stable)
+- ~~`codecov-action@v4` could be updated to `v5` (current stable)~~ **Fixed.** Updated to `codecov-action@v5`.
 - No coverage threshold is enforced — coverage is uploaded but regressions aren't caught
 
 ---
@@ -97,6 +87,9 @@ Items resolved since the original audit:
 | — | **Monthly guild item claim** (`handlers_guild.go:389`) | Now tracks per-character per-type monthly claims via `stamps` table. |
 | — | **Handler test coverage (4 files)** | Tests added for `handlers_session.go`, `handlers_gacha.go`, `handlers_plate.go`, `handlers_shop.go`. |
 | — | **Entrance server raw SQL** | Refactored to repository interfaces (`repo_interfaces.go`, `repo_session.go`, `repo_server.go`). |
+| — | **Guild daily RP rollover** (`handlers_guild_ops.go:148`) | Implemented via lazy rollover in `handlers_guild.go:110-119` using `RolloverDailyRP()`. Stale TODO removed. |
+| — | **Typos** (`sys_session.go`, `handlers_session.go`) | "For Debuging" and "offical" typos already fixed in previous commits. |
+| — | **`db != nil` guard** (`handlers_session.go:322`) | Investigated — this guard is intentional. Test servers run without repos; the guard protects the entire logout path from nil repo dereferences. Not a leaky abstraction. |
 
 ---
 
@@ -105,7 +98,6 @@ Items resolved since the original audit:
 Based on remaining impact:
 
 1. **Add tests for `handlers_commands.go`** — highest-risk remaining untested handler (admin commands)
-2. **Fix bookshelf data pointer** (`model_character.go`) — corrupts saves for three game versions
-3. **Implement guild daily RP rollover** (`handlers_guild_ops.go:148`) — missing game feature
-4. **Fix typos** (`sys_session.go:73`, `handlers_session.go:394`) — quick cleanup
-5. **Update `codecov-action` to v5** and add coverage threshold — prevents regressions
+2. **Fix bookshelf data pointer** (`model_character.go`) — corrupts saves for three game versions (needs save data validation)
+3. **Fix achievement rank-up notifications** (`handlers_achievement.go:125`) — needs protocol research on `MhfDisplayedAchievement`
+4. **Add coverage threshold** to CI — prevents regressions
