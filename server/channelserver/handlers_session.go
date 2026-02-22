@@ -391,7 +391,7 @@ func handleMsgSysIssueLogkey(s *Session, p mhfpacket.MHFPacket) {
 		return
 	}
 
-	// TODO(Andoryuuta): In the offical client, the log key index is off by one,
+	// TODO(Andoryuuta): In the official client, the log key index is off by one,
 	// cutting off the last byte in _most uses_. Find and document these accordingly.
 	s.Lock()
 	s.logKey = logKey

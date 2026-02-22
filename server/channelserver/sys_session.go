@@ -70,7 +70,6 @@ type Session struct {
 	// Contains the mail list that maps accumulated indexes to mail IDs
 	mailList []int
 
-	// For Debuging
 	Name     string
 	closed   atomic.Bool
 	ackStart map[uint32]time.Time
