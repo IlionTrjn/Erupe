@@ -1,6 +1,6 @@
 # Erupe
 
-[![Build and Test](https://github.com/Mezeporta/Erupe/actions/workflows/go-improved.yml/badge.svg)](https://github.com/Mezeporta/Erupe/actions/workflows/go-improved.yml)
+[![Build and Test](https://github.com/Mezeporta/Erupe/actions/workflows/go.yml/badge.svg)](https://github.com/Mezeporta/Erupe/actions/workflows/go.yml)
 [![CodeQL](https://github.com/Mezeporta/Erupe/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/Mezeporta/Erupe/actions/workflows/github-code-scanning/codeql)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Mezeporta/Erupe)](https://go.dev/)
 [![Latest Release](https://img.shields.io/github/v/release/Mezeporta/Erupe)](https://github.com/Mezeporta/Erupe/releases/latest)

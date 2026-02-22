@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.os_name }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            os_name: Linux-amd64
+            binary: erupe-ce
+          - goos: windows
+            goarch: amd64
+            os_name: Windows-amd64
+            binary: erupe-ce.exe
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25'
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Build
+      run: env GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -o ${{ matrix.binary }}
+
+    - name: Prepare release archive
+      run: |
+        mkdir -p staging
+        cp ${{ matrix.binary }} staging/
+        cp config.example.json staging/
+        cp -r www/ staging/www/
+        cp -r savedata/ staging/savedata/
+        cp -r schemas/ staging/schemas/
+        # Create a standalone SCHEMA.sql from init schema for convenience
+        cp schemas/init.sql staging/SCHEMA.sql
+        cd staging && zip -r ../erupe-${{ matrix.os_name }}.zip .
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.os_name }}
+        path: erupe-${{ matrix.os_name }}.zip
+        retention-days: 1
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Copy SCHEMA.sql for standalone download
+      run: cp schemas/init.sql SCHEMA.sql
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        generate_release_notes: true
+        files: |
+          artifacts/Linux-amd64/erupe-Linux-amd64.zip
+          artifacts/Windows-amd64/erupe-Windows-amd64.zip
+          SCHEMA.sql
