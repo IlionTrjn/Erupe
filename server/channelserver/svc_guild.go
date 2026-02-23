@@ -84,16 +84,16 @@ type AnswerScoutResult struct {
 // GuildService encapsulates guild business logic, sitting between handlers and repos.
 type GuildService struct {
 	guildRepo GuildRepo
-	mailRepo  MailRepo
+	mailSvc   *MailService
 	charRepo  CharacterRepo
 	logger    *zap.Logger
 }
 
 // NewGuildService creates a new GuildService.
-func NewGuildService(gr GuildRepo, mr MailRepo, cr CharacterRepo, log *zap.Logger) *GuildService {
+func NewGuildService(gr GuildRepo, ms *MailService, cr CharacterRepo, log *zap.Logger) *GuildService {
 	return &GuildService{
 		guildRepo: gr,
-		mailRepo:  mr,
+		mailSvc:   ms,
 		charRepo:  cr,
 		logger:    log,
 	}
@@ -148,7 +148,7 @@ func (svc *GuildService) OperateMember(actorCharID, targetCharID uint32, action 
 	}
 
 	// Send mail best-effort
-	if mailErr := svc.mailRepo.SendMail(mail.SenderID, mail.RecipientID, mail.Subject, mail.Body, 0, 0, false, true); mailErr != nil {
+	if mailErr := svc.mailSvc.SendSystem(mail.RecipientID, mail.Subject, mail.Body); mailErr != nil {
 		svc.logger.Warn("Failed to send guild member operation mail", zap.Error(mailErr))
 	}
 
@@ -255,9 +255,8 @@ func (svc *GuildService) Leave(charID, guildID uint32, isApplicant bool, guildNa
 	}
 
 	// Best-effort withdrawal notification
-	if err := svc.mailRepo.SendMail(0, charID, "Withdrawal",
-		fmt.Sprintf("You have withdrawn from 「%s」.", guildName),
-		0, 0, false, true); err != nil {
+	if err := svc.mailSvc.SendSystem(charID, "Withdrawal",
+		fmt.Sprintf("You have withdrawn from 「%s」.", guildName)); err != nil {
 		svc.logger.Warn("Failed to send guild withdrawal notification", zap.Error(err))
 	}
 
@@ -342,7 +341,7 @@ func (svc *GuildService) AnswerScout(charID, leaderID uint32, accept bool, strin
 
 	// Send mails best-effort
 	for _, m := range mails {
-		if mailErr := svc.mailRepo.SendMail(m.SenderID, m.RecipientID, m.Subject, m.Body, 0, 0, false, true); mailErr != nil {
+		if mailErr := svc.mailSvc.SendSystem(m.RecipientID, m.Subject, m.Body); mailErr != nil {
 			svc.logger.Warn("Failed to send guild scout response mail", zap.Error(mailErr))
 		}
 	}

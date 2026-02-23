@@ -55,10 +55,17 @@ func createMockServer() *Server {
 	return s
 }
 
+// ensureMailService wires the MailService from the server's current repos.
+// Call this after setting mailRepo and guildRepo on the mock server.
+func ensureMailService(s *Server) {
+	s.mailService = NewMailService(s.mailRepo, s.guildRepo, s.logger)
+}
+
 // ensureGuildService wires the GuildService from the server's current repos.
 // Call this after setting guildRepo, mailRepo, and charRepo on the mock server.
 func ensureGuildService(s *Server) {
-	s.guildService = NewGuildService(s.guildRepo, s.mailRepo, s.charRepo, s.logger)
+	ensureMailService(s)
+	s.guildService = NewGuildService(s.guildRepo, s.mailService, s.charRepo, s.logger)
 }
 
 // ensureAchievementService wires the AchievementService from the server's current repos.

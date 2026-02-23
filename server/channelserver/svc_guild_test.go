@@ -7,9 +7,15 @@ import (
 	"go.uber.org/zap"
 )
 
+func newTestMailService(mr MailRepo, gr GuildRepo) *MailService {
+	logger, _ := zap.NewDevelopment()
+	return NewMailService(mr, gr, logger)
+}
+
 func newTestGuildService(gr GuildRepo, mr MailRepo) *GuildService {
 	logger, _ := zap.NewDevelopment()
-	return NewGuildService(gr, mr, nil, logger)
+	ms := newTestMailService(mr, gr)
+	return NewGuildService(gr, ms, nil, logger)
 }
 
 func TestGuildService_OperateMember(t *testing.T) {

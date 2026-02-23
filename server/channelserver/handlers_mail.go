@@ -194,31 +194,21 @@ func handleMsgMhfOprtMail(s *Session, p mhfpacket.MHFPacket) {
 func handleMsgMhfSendMail(s *Session, p mhfpacket.MHFPacket) {
 	pkt := p.(*mhfpacket.MsgMhfSendMail)
 
-	if pkt.RecipientID == 0 { // Guild mail
+	if pkt.RecipientID == 0 { // Guild mail broadcast
 		g, err := s.server.guildRepo.GetByCharID(s.charID)
 		if err != nil {
 			s.logger.Error("Failed to get guild info for mail")
 			doAckSimpleSucceed(s, pkt.AckHandle, make([]byte, 4))
 			return
 		}
-		gm, err := s.server.guildRepo.GetMembers(g.ID, false)
-		if err != nil {
-			s.logger.Error("Failed to get guild members for mail")
+		if err := s.server.mailService.BroadcastToGuild(s.charID, g.ID, pkt.Subject, pkt.Body); err != nil {
+			s.logger.Error("Failed to broadcast guild mail", zap.Error(err))
 			doAckSimpleSucceed(s, pkt.AckHandle, make([]byte, 4))
 			return
 		}
-		for i := 0; i < len(gm); i++ {
-			err := s.server.mailRepo.SendMail(s.charID, gm[i].CharID, pkt.Subject, pkt.Body, 0, 0, false, false)
-			if err != nil {
-				s.logger.Error("Failed to send mail")
-				doAckSimpleSucceed(s, pkt.AckHandle, make([]byte, 4))
-				return
-			}
-		}
 	} else {
-		err := s.server.mailRepo.SendMail(s.charID, pkt.RecipientID, pkt.Subject, pkt.Body, pkt.ItemID, pkt.Quantity, false, false)
-		if err != nil {
-			s.logger.Error("Failed to send mail")
+		if err := s.server.mailService.Send(s.charID, pkt.RecipientID, pkt.Subject, pkt.Body, pkt.ItemID, pkt.Quantity); err != nil {
+			s.logger.Error("Failed to send mail", zap.Error(err))
 		}
 	}
 	doAckSimpleSucceed(s, pkt.AckHandle, make([]byte, 4))

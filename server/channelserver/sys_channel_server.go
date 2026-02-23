@@ -43,44 +43,45 @@ type Config struct {
 // own locks internally and may be acquired at any point.
 type Server struct {
 	sync.Mutex
-	Registry        ChannelRegistry
-	ID              uint16
-	GlobalID        string
-	IP              string
-	Port            uint16
-	logger          *zap.Logger
-	db              *sqlx.DB
-	charRepo        CharacterRepo
-	guildRepo       GuildRepo
-	userRepo        UserRepo
-	gachaRepo       GachaRepo
-	houseRepo       HouseRepo
-	festaRepo       FestaRepo
-	towerRepo       TowerRepo
-	rengokuRepo     RengokuRepo
-	mailRepo        MailRepo
-	stampRepo       StampRepo
-	distRepo        DistributionRepo
-	sessionRepo     SessionRepo
-	eventRepo       EventRepo
-	achievementRepo AchievementRepo
-	shopRepo        ShopRepo
-	cafeRepo        CafeRepo
-	goocooRepo      GoocooRepo
-	divaRepo        DivaRepo
-	miscRepo        MiscRepo
-	scenarioRepo    ScenarioRepo
-	mercenaryRepo   MercenaryRepo
+	Registry           ChannelRegistry
+	ID                 uint16
+	GlobalID           string
+	IP                 string
+	Port               uint16
+	logger             *zap.Logger
+	db                 *sqlx.DB
+	charRepo           CharacterRepo
+	guildRepo          GuildRepo
+	userRepo           UserRepo
+	gachaRepo          GachaRepo
+	houseRepo          HouseRepo
+	festaRepo          FestaRepo
+	towerRepo          TowerRepo
+	rengokuRepo        RengokuRepo
+	mailRepo           MailRepo
+	stampRepo          StampRepo
+	distRepo           DistributionRepo
+	sessionRepo        SessionRepo
+	eventRepo          EventRepo
+	achievementRepo    AchievementRepo
+	shopRepo           ShopRepo
+	cafeRepo           CafeRepo
+	goocooRepo         GoocooRepo
+	divaRepo           DivaRepo
+	miscRepo           MiscRepo
+	scenarioRepo       ScenarioRepo
+	mercenaryRepo      MercenaryRepo
+	mailService        *MailService
 	guildService       *GuildService
 	achievementService *AchievementService
 	gachaService       *GachaService
-	erupeConfig     *cfg.Config
-	acceptConns     chan net.Conn
-	deleteConns     chan net.Conn
-	sessions        map[net.Conn]*Session
-	listener        net.Listener // Listener that is created when Server.Start is called.
-	isShuttingDown  bool
-	done            chan struct{} // Closed on Shutdown to wake background goroutines.
+	erupeConfig        *cfg.Config
+	acceptConns        chan net.Conn
+	deleteConns        chan net.Conn
+	sessions           map[net.Conn]*Session
+	listener           net.Listener // Listener that is created when Server.Start is called.
+	isShuttingDown     bool
+	done               chan struct{} // Closed on Shutdown to wake background goroutines.
 
 	stages StageMap
 
@@ -156,7 +157,8 @@ func NewServer(config *Config) *Server {
 	s.scenarioRepo = NewScenarioRepository(config.DB)
 	s.mercenaryRepo = NewMercenaryRepository(config.DB)
 
-	s.guildService = NewGuildService(s.guildRepo, s.mailRepo, s.charRepo, s.logger)
+	s.mailService = NewMailService(s.mailRepo, s.guildRepo, s.logger)
+	s.guildService = NewGuildService(s.guildRepo, s.mailService, s.charRepo, s.logger)
 	s.achievementService = NewAchievementService(s.achievementRepo, s.logger)
 	s.gachaService = NewGachaService(s.gachaRepo, s.userRepo, s.charRepo, s.logger, config.ErupeConfig.GameplayOptions.MaximumNP)
 

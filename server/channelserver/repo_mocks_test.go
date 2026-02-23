@@ -265,9 +265,10 @@ func (m *mockGoocooRepo) SaveSlot(_ uint32, slot uint32, data []byte) error {
 // --- mockGuildRepo (minimal, for SendMail guild path) ---
 
 type mockGuildRepoForMail struct {
-	guild   *Guild
-	members []*GuildMember
-	getErr  error
+	guild         *Guild
+	members       []*GuildMember
+	getErr        error
+	getMembersErr error
 }
 
 func (m *mockGuildRepoForMail) GetByCharID(_ uint32) (*Guild, error) {
@@ -278,6 +279,9 @@ func (m *mockGuildRepoForMail) GetByCharID(_ uint32) (*Guild, error) {
 }
 
 func (m *mockGuildRepoForMail) GetMembers(_ uint32, _ bool) ([]*GuildMember, error) {
+	if m.getMembersErr != nil {
+		return nil, m.getMembersErr
+	}
 	return m.members, nil
 }
 
