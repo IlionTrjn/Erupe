@@ -185,7 +185,7 @@ func CreateTestCharacter(t *testing.T, db *sqlx.DB, userID uint32, name string) 
 	// Create minimal valid savedata (needs to be large enough for the game to parse)
 	// The name is at offset 88, and various game mode pointers extend up to ~147KB for ZZ mode
 	// We need at least 150KB to accommodate all possible pointer offsets
-	saveData := make([]byte, 150000) // Large enough for all game modes
+	saveData := make([]byte, 150000)                // Large enough for all game modes
 	copy(saveData[88:], append([]byte(name), 0x00)) // Name at offset 88 with null terminator
 
 	// Import the nullcomp package for compression

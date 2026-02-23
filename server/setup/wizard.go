@@ -30,158 +30,13 @@ type FinishRequest struct {
 	AutoCreateAccount bool   `json:"autoCreateAccount"`
 }
 
-// buildDefaultConfig produces a config map matching config.example.json structure
-// with the user's values merged in.
+// buildDefaultConfig produces a minimal config map with only user-provided values.
+// All other settings are filled by Viper's registered defaults at load time.
 func buildDefaultConfig(req FinishRequest) map[string]interface{} {
-	config := map[string]interface{}{
-		"Host":                   req.Host,
-		"BinPath":                "bin",
-		"Language":               "en",
-		"DisableSoftCrash":       false,
-		"HideLoginNotice":        true,
-		"LoginNotices":           []string{"<BODY><CENTER><SIZE_3><C_4>Welcome to Erupe!"},
-		"PatchServerManifest":    "",
-		"PatchServerFile":        "",
-		"DeleteOnSaveCorruption": false,
-		"ClientMode":             req.ClientMode,
-		"QuestCacheExpiry":       300,
-		"CommandPrefix":          "!",
-		"AutoCreateAccount":      req.AutoCreateAccount,
-		"LoopDelay":              50,
-		"DefaultCourses":         []int{1, 23, 24},
-		"EarthStatus":            0,
-		"EarthID":                0,
-		"EarthMonsters":          []int{0, 0, 0, 0},
-		"Screenshots": map[string]interface{}{
-			"Enabled":       true,
-			"Host":          "127.0.0.1",
-			"Port":          8080,
-			"OutputDir":     "screenshots",
-			"UploadQuality": 100,
-		},
-		"SaveDumps": map[string]interface{}{
-			"Enabled":    true,
-			"RawEnabled": false,
-			"OutputDir":  "save-backups",
-		},
-		"Capture": map[string]interface{}{
-			"Enabled":         false,
-			"OutputDir":       "captures",
-			"ExcludeOpcodes":  []int{},
-			"CaptureSign":     true,
-			"CaptureEntrance": true,
-			"CaptureChannel":  true,
-		},
-		"DebugOptions": map[string]interface{}{
-			"CleanDB":             false,
-			"MaxLauncherHR":       false,
-			"LogInboundMessages":  false,
-			"LogOutboundMessages": false,
-			"LogMessageData":      false,
-			"MaxHexdumpLength":    256,
-			"DivaOverride":        0,
-			"FestaOverride":       -1,
-			"TournamentOverride":  0,
-			"DisableTokenCheck":   false,
-			"QuestTools":          false,
-			"AutoQuestBackport":   true,
-			"ProxyPort":           0,
-			"CapLink": map[string]interface{}{
-				"Values": []int{51728, 20000, 51729, 1, 20000},
-				"Key":    "",
-				"Host":   "",
-				"Port":   80,
-			},
-		},
-		"GameplayOptions": map[string]interface{}{
-			"MinFeatureWeapons":              0,
-			"MaxFeatureWeapons":              1,
-			"MaximumNP":                      100000,
-			"MaximumRP":                      50000,
-			"MaximumFP":                      120000,
-			"TreasureHuntExpiry":             604800,
-			"DisableLoginBoost":              false,
-			"DisableBoostTime":               false,
-			"BoostTimeDuration":              7200,
-			"ClanMealDuration":               3600,
-			"ClanMemberLimits":               [][]int{{0, 30}, {3, 40}, {7, 50}, {10, 60}},
-			"BonusQuestAllowance":            3,
-			"DailyQuestAllowance":            1,
-			"LowLatencyRaviente":             false,
-			"RegularRavienteMaxPlayers":      8,
-			"ViolentRavienteMaxPlayers":      8,
-			"BerserkRavienteMaxPlayers":      32,
-			"ExtremeRavienteMaxPlayers":      32,
-			"SmallBerserkRavienteMaxPlayers": 8,
-			"GUrgentRate":                    0.10,
-			"GCPMultiplier":                  1.00,
-			"HRPMultiplier":                  1.00,
-			"HRPMultiplierNC":                1.00,
-			"SRPMultiplier":                  1.00,
-			"SRPMultiplierNC":                1.00,
-			"GRPMultiplier":                  1.00,
-			"GRPMultiplierNC":                1.00,
-			"GSRPMultiplier":                 1.00,
-			"GSRPMultiplierNC":               1.00,
-			"ZennyMultiplier":                1.00,
-			"ZennyMultiplierNC":              1.00,
-			"GZennyMultiplier":               1.00,
-			"GZennyMultiplierNC":             1.00,
-			"MaterialMultiplier":             1.00,
-			"MaterialMultiplierNC":           1.00,
-			"GMaterialMultiplier":            1.00,
-			"GMaterialMultiplierNC":          1.00,
-			"ExtraCarves":                    0,
-			"ExtraCarvesNC":                  0,
-			"GExtraCarves":                   0,
-			"GExtraCarvesNC":                 0,
-			"DisableHunterNavi":              false,
-			"MezFesSoloTickets":              5,
-			"MezFesGroupTickets":             1,
-			"MezFesDuration":                 172800,
-			"MezFesSwitchMinigame":           false,
-			"EnableKaijiEvent":               false,
-			"EnableHiganjimaEvent":           false,
-			"EnableNierEvent":                false,
-			"DisableRoad":                    false,
-			"SeasonOverride":                 false,
-		},
-		"Discord": map[string]interface{}{
-			"Enabled":  false,
-			"BotToken": "",
-			"RelayChannel": map[string]interface{}{
-				"Enabled":          false,
-				"MaxMessageLength": 183,
-				"RelayChannelID":   "",
-			},
-		},
-		"Commands": []map[string]interface{}{
-			{"Name": "Help", "Enabled": true, "Description": "Show enabled chat commands", "Prefix": "help"},
-			{"Name": "Rights", "Enabled": false, "Description": "Overwrite the Rights value on your account", "Prefix": "rights"},
-			{"Name": "Raviente", "Enabled": true, "Description": "Various Raviente siege commands", "Prefix": "ravi"},
-			{"Name": "Teleport", "Enabled": false, "Description": "Teleport to specified coordinates", "Prefix": "tele"},
-			{"Name": "Reload", "Enabled": true, "Description": "Reload all players in your Land", "Prefix": "reload"},
-			{"Name": "KeyQuest", "Enabled": false, "Description": "Overwrite your HR Key Quest progress", "Prefix": "kqf"},
-			{"Name": "Course", "Enabled": true, "Description": "Toggle Courses on your account", "Prefix": "course"},
-			{"Name": "PSN", "Enabled": true, "Description": "Link a PlayStation Network ID to your account", "Prefix": "psn"},
-			{"Name": "Discord", "Enabled": true, "Description": "Generate a token to link your Discord account", "Prefix": "discord"},
-			{"Name": "Ban", "Enabled": false, "Description": "Ban/Temp Ban a user", "Prefix": "ban"},
-			{"Name": "Timer", "Enabled": true, "Description": "Toggle the Quest timer", "Prefix": "timer"},
-			{"Name": "Playtime", "Enabled": true, "Description": "Show your playtime", "Prefix": "playtime"},
-		},
-		"Courses": []map[string]interface{}{
-			{"Name": "HunterLife", "Enabled": true},
-			{"Name": "Extra", "Enabled": true},
-			{"Name": "Premium", "Enabled": true},
-			{"Name": "Assist", "Enabled": false},
-			{"Name": "N", "Enabled": false},
-			{"Name": "Hiden", "Enabled": false},
-			{"Name": "HunterSupport", "Enabled": false},
-			{"Name": "NBoost", "Enabled": false},
-			{"Name": "NetCafe", "Enabled": true},
-			{"Name": "HLRenewing", "Enabled": true},
-			{"Name": "EXRenewing", "Enabled": true},
-		},
+	return map[string]interface{}{
+		"Host":              req.Host,
+		"ClientMode":        req.ClientMode,
+		"AutoCreateAccount": req.AutoCreateAccount,
 		"Database": map[string]interface{}{
 			"Host":     req.DBHost,
 			"Port":     req.DBPort,
@@ -189,73 +44,7 @@ func buildDefaultConfig(req FinishRequest) map[string]interface{} {
 			"Password": req.DBPassword,
 			"Database": req.DBName,
 		},
-		"Sign": map[string]interface{}{
-			"Enabled": true,
-			"Port":    53312,
-		},
-		"API": map[string]interface{}{
-			"Enabled":     true,
-			"Port":        8080,
-			"PatchServer": "",
-			"Banners":     []interface{}{},
-			"Messages":    []interface{}{},
-			"Links":       []interface{}{},
-			"LandingPage": map[string]interface{}{
-				"Enabled": true,
-				"Title":   "My Frontier Server",
-				"Content": "<p>Welcome! Server is running.</p>",
-			},
-		},
-		"Channel": map[string]interface{}{
-			"Enabled": true,
-		},
-		"Entrance": map[string]interface{}{
-			"Enabled": true,
-			"Port":    53310,
-			"Entries": []map[string]interface{}{
-				{
-					"Name": "Newbie", "Description": "", "IP": "", "Type": 3, "Recommended": 2, "AllowedClientFlags": 0,
-					"Channels": []map[string]interface{}{
-						{"Port": 54001, "MaxPlayers": 100, "Enabled": true},
-						{"Port": 54002, "MaxPlayers": 100, "Enabled": true},
-					},
-				},
-				{
-					"Name": "Normal", "Description": "", "IP": "", "Type": 1, "Recommended": 0, "AllowedClientFlags": 0,
-					"Channels": []map[string]interface{}{
-						{"Port": 54003, "MaxPlayers": 100, "Enabled": true},
-						{"Port": 54004, "MaxPlayers": 100, "Enabled": true},
-					},
-				},
-				{
-					"Name": "Cities", "Description": "", "IP": "", "Type": 2, "Recommended": 0, "AllowedClientFlags": 0,
-					"Channels": []map[string]interface{}{
-						{"Port": 54005, "MaxPlayers": 100, "Enabled": true},
-					},
-				},
-				{
-					"Name": "Tavern", "Description": "", "IP": "", "Type": 4, "Recommended": 0, "AllowedClientFlags": 0,
-					"Channels": []map[string]interface{}{
-						{"Port": 54006, "MaxPlayers": 100, "Enabled": true},
-					},
-				},
-				{
-					"Name": "Return", "Description": "", "IP": "", "Type": 5, "Recommended": 0, "AllowedClientFlags": 0,
-					"Channels": []map[string]interface{}{
-						{"Port": 54007, "MaxPlayers": 100, "Enabled": true},
-					},
-				},
-				{
-					"Name": "MezFes", "Description": "", "IP": "", "Type": 6, "Recommended": 6, "AllowedClientFlags": 0,
-					"Channels": []map[string]interface{}{
-						{"Port": 54008, "MaxPlayers": 100, "Enabled": true},
-					},
-				},
-			},
-		},
 	}
-
-	return config
 }
 
 // writeConfig writes the config map to config.json with pretty formatting.
@@ -368,4 +157,3 @@ func createDatabase(host string, port int, user, password, dbName string) error 
 	}
 	return nil
 }
-

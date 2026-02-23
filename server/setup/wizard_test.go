@@ -56,13 +56,9 @@ func TestBuildDefaultConfig(t *testing.T) {
 		t.Errorf("Database.Database = %v, want mydb", db["Database"])
 	}
 
-	// Check that critical sections exist
-	requiredKeys := []string{
-		"Host", "BinPath", "Language", "ClientMode", "Database",
-		"Sign", "API", "Channel", "Entrance", "DebugOptions",
-		"GameplayOptions", "Discord", "Commands", "Courses",
-		"SaveDumps", "Capture", "Screenshots",
-	}
+	// Wizard config is now minimal — only user-provided values.
+	// Viper defaults fill the rest at load time.
+	requiredKeys := []string{"Host", "ClientMode", "AutoCreateAccount", "Database"}
 	for _, key := range requiredKeys {
 		if _, ok := cfg[key]; !ok {
 			t.Errorf("missing required key %q", key)
@@ -74,7 +70,7 @@ func TestBuildDefaultConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to marshal config: %v", err)
 	}
-	if len(data) < 100 {
+	if len(data) < 50 {
 		t.Errorf("config JSON unexpectedly short: %d bytes", len(data))
 	}
 }

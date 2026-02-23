@@ -338,22 +338,195 @@ func getOutboundIP4() (net.IP, error) {
 	return localAddr.IP.To4(), nil
 }
 
-// LoadConfig loads the given config toml file.
-func LoadConfig() (*Config, error) {
-	viper.SetConfigName("config")
-	viper.AddConfigPath(".")
+// registerDefaults sets all sane defaults via Viper so that a minimal
+// config.json (just database credentials) produces a fully working server.
+func registerDefaults() {
+	// Top-level settings
+	viper.SetDefault("BinPath", "bin")
+	viper.SetDefault("HideLoginNotice", true)
+	viper.SetDefault("LoginNotices", []string{
+		"<BODY><CENTER><SIZE_3><C_4>Welcome to Erupe!",
+	})
+	viper.SetDefault("ClientMode", "ZZ")
+	viper.SetDefault("QuestCacheExpiry", 300)
+	viper.SetDefault("CommandPrefix", "!")
+	viper.SetDefault("AutoCreateAccount", true)
+	viper.SetDefault("LoopDelay", 50)
+	viper.SetDefault("DefaultCourses", []uint16{1, 23, 24})
+	viper.SetDefault("EarthMonsters", []int32{0, 0, 0, 0})
 
-	viper.SetDefault("DevModeOptions.SaveDumps", SaveDumpOptions{
+	// SaveDumps
+	viper.SetDefault("SaveDumps", SaveDumpOptions{
 		Enabled:   true,
 		OutputDir: "save-backups",
 	})
+
+	// Screenshots
+	viper.SetDefault("Screenshots", ScreenshotsOptions{
+		Enabled:       true,
+		Host:          "127.0.0.1",
+		Port:          8080,
+		OutputDir:     "screenshots",
+		UploadQuality: 100,
+	})
+
+	// Capture
 	viper.SetDefault("Capture", CaptureOptions{
 		OutputDir:       "captures",
 		CaptureSign:     true,
 		CaptureEntrance: true,
 		CaptureChannel:  true,
 	})
-	viper.SetDefault("LoopDelay", 50)
+
+	// DebugOptions (dot-notation for per-field merge)
+	viper.SetDefault("DebugOptions.MaxHexdumpLength", 256)
+	viper.SetDefault("DebugOptions.FestaOverride", -1)
+	viper.SetDefault("DebugOptions.AutoQuestBackport", true)
+	viper.SetDefault("DebugOptions.CapLink", CapLinkOptions{
+		Values: []uint16{51728, 20000, 51729, 1, 20000},
+		Port:   80,
+	})
+
+	// GameplayOptions (dot-notation — critical to avoid zeroing multipliers)
+	viper.SetDefault("GameplayOptions.MaxFeatureWeapons", 1)
+	viper.SetDefault("GameplayOptions.MaximumNP", 100000)
+	viper.SetDefault("GameplayOptions.MaximumRP", uint16(50000))
+	viper.SetDefault("GameplayOptions.MaximumFP", uint32(120000))
+	viper.SetDefault("GameplayOptions.TreasureHuntExpiry", uint32(604800))
+	viper.SetDefault("GameplayOptions.BoostTimeDuration", 7200)
+	viper.SetDefault("GameplayOptions.ClanMealDuration", 3600)
+	viper.SetDefault("GameplayOptions.ClanMemberLimits", [][]uint8{{0, 30}, {3, 40}, {7, 50}, {10, 60}})
+	viper.SetDefault("GameplayOptions.BonusQuestAllowance", uint32(3))
+	viper.SetDefault("GameplayOptions.DailyQuestAllowance", uint32(1))
+	viper.SetDefault("GameplayOptions.RegularRavienteMaxPlayers", uint8(8))
+	viper.SetDefault("GameplayOptions.ViolentRavienteMaxPlayers", uint8(8))
+	viper.SetDefault("GameplayOptions.BerserkRavienteMaxPlayers", uint8(32))
+	viper.SetDefault("GameplayOptions.ExtremeRavienteMaxPlayers", uint8(32))
+	viper.SetDefault("GameplayOptions.SmallBerserkRavienteMaxPlayers", uint8(8))
+	viper.SetDefault("GameplayOptions.GUrgentRate", float64(0.10))
+	// All reward multipliers default to 1.0 — without this, Go's zero value
+	// (0.0) would zero out all quest rewards for minimal configs.
+	for _, key := range []string{
+		"GCPMultiplier", "HRPMultiplier", "HRPMultiplierNC",
+		"SRPMultiplier", "SRPMultiplierNC", "GRPMultiplier", "GRPMultiplierNC",
+		"GSRPMultiplier", "GSRPMultiplierNC", "ZennyMultiplier", "ZennyMultiplierNC",
+		"GZennyMultiplier", "GZennyMultiplierNC", "MaterialMultiplier", "MaterialMultiplierNC",
+		"GMaterialMultiplier", "GMaterialMultiplierNC",
+	} {
+		viper.SetDefault("GameplayOptions."+key, float64(1.0))
+	}
+	viper.SetDefault("GameplayOptions.MezFesSoloTickets", uint32(5))
+	viper.SetDefault("GameplayOptions.MezFesGroupTickets", uint32(1))
+	viper.SetDefault("GameplayOptions.MezFesDuration", 172800)
+
+	// Discord
+	viper.SetDefault("Discord.RelayChannel.MaxMessageLength", 183)
+
+	// Commands (whole-struct default — replaced entirely if user provides any)
+	viper.SetDefault("Commands", []Command{
+		{Name: "Help", Enabled: true, Description: "Show enabled chat commands", Prefix: "help"},
+		{Name: "Rights", Enabled: false, Description: "Overwrite the Rights value on your account", Prefix: "rights"},
+		{Name: "Raviente", Enabled: true, Description: "Various Raviente siege commands", Prefix: "ravi"},
+		{Name: "Teleport", Enabled: false, Description: "Teleport to specified coordinates", Prefix: "tele"},
+		{Name: "Reload", Enabled: true, Description: "Reload all players in your Land", Prefix: "reload"},
+		{Name: "KeyQuest", Enabled: false, Description: "Overwrite your HR Key Quest progress", Prefix: "kqf"},
+		{Name: "Course", Enabled: true, Description: "Toggle Courses on your account", Prefix: "course"},
+		{Name: "PSN", Enabled: true, Description: "Link a PlayStation Network ID to your account", Prefix: "psn"},
+		{Name: "Discord", Enabled: true, Description: "Generate a token to link your Discord account", Prefix: "discord"},
+		{Name: "Ban", Enabled: false, Description: "Ban/Temp Ban a user", Prefix: "ban"},
+		{Name: "Timer", Enabled: true, Description: "Toggle the Quest timer", Prefix: "timer"},
+		{Name: "Playtime", Enabled: true, Description: "Show your playtime", Prefix: "playtime"},
+	})
+
+	// Courses
+	viper.SetDefault("Courses", []Course{
+		{Name: "HunterLife", Enabled: true},
+		{Name: "Extra", Enabled: true},
+		{Name: "Premium", Enabled: true},
+		{Name: "Assist", Enabled: false},
+		{Name: "N", Enabled: false},
+		{Name: "Hiden", Enabled: false},
+		{Name: "HunterSupport", Enabled: false},
+		{Name: "NBoost", Enabled: false},
+		{Name: "NetCafe", Enabled: true},
+		{Name: "HLRenewing", Enabled: true},
+		{Name: "EXRenewing", Enabled: true},
+	})
+
+	// Database (Password deliberately has no default)
+	viper.SetDefault("Database.Host", "localhost")
+	viper.SetDefault("Database.Port", 5432)
+	viper.SetDefault("Database.User", "postgres")
+	viper.SetDefault("Database.Database", "erupe")
+
+	// Sign server
+	viper.SetDefault("Sign.Enabled", true)
+	viper.SetDefault("Sign.Port", 53312)
+
+	// API server
+	viper.SetDefault("API.Enabled", true)
+	viper.SetDefault("API.Port", 8080)
+	viper.SetDefault("API.LandingPage", LandingPage{
+		Enabled: true,
+		Title:   "My Frontier Server",
+		Content: "<p>Welcome! Server is running.</p>",
+	})
+
+	// Channel server
+	viper.SetDefault("Channel.Enabled", true)
+
+	// Entrance server
+	viper.SetDefault("Entrance.Enabled", true)
+	viper.SetDefault("Entrance.Port", uint16(53310))
+	boolTrue := true
+	viper.SetDefault("Entrance.Entries", []EntranceServerInfo{
+		{
+			Name: "Newbie", Type: 3, Recommended: 2,
+			Channels: []EntranceChannelInfo{
+				{Port: 54001, MaxPlayers: 100, Enabled: &boolTrue},
+				{Port: 54002, MaxPlayers: 100, Enabled: &boolTrue},
+			},
+		},
+		{
+			Name: "Normal", Type: 1,
+			Channels: []EntranceChannelInfo{
+				{Port: 54003, MaxPlayers: 100, Enabled: &boolTrue},
+				{Port: 54004, MaxPlayers: 100, Enabled: &boolTrue},
+			},
+		},
+		{
+			Name: "Cities", Type: 2,
+			Channels: []EntranceChannelInfo{
+				{Port: 54005, MaxPlayers: 100, Enabled: &boolTrue},
+			},
+		},
+		{
+			Name: "Tavern", Type: 4,
+			Channels: []EntranceChannelInfo{
+				{Port: 54006, MaxPlayers: 100, Enabled: &boolTrue},
+			},
+		},
+		{
+			Name: "Return", Type: 5,
+			Channels: []EntranceChannelInfo{
+				{Port: 54007, MaxPlayers: 100, Enabled: &boolTrue},
+			},
+		},
+		{
+			Name: "MezFes", Type: 6, Recommended: 6,
+			Channels: []EntranceChannelInfo{
+				{Port: 54008, MaxPlayers: 100, Enabled: &boolTrue},
+			},
+		},
+	})
+}
+
+// LoadConfig loads the given config toml file.
+func LoadConfig() (*Config, error) {
+	viper.SetConfigName("config")
+	viper.AddConfigPath(".")
+
+	registerDefaults()
 
 	err := viper.ReadInConfig()
 	if err != nil {

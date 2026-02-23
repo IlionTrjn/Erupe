@@ -156,7 +156,7 @@ Edit `config.json` before starting the server. The essential settings are:
 | `BinPath` | Path to quest/scenario files |
 | `Language` | `"en"` or `"jp"` |
 
-For the full configuration reference (gameplay multipliers, debug options, Discord integration, in-game commands, entrance/channel definitions), see [config.example.json](./config.example.json) and the [Erupe Wiki](https://github.com/Mezeporta/Erupe/wiki).
+`config.example.json` is intentionally minimal — all other settings have sane defaults built into the server. For the full configuration reference (gameplay multipliers, debug options, Discord integration, in-game commands, entrance/channel definitions), see [config.reference.json](./config.reference.json) and the [Erupe Wiki](https://github.com/Mezeporta/Erupe/wiki).
 
 ## Features
 

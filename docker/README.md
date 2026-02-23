@@ -8,7 +8,7 @@
    cp config.example.json docker/config.json
    ```
 
-   Edit `docker/config.json` — set `Database.Host` to `"db"` and match the password to `docker-compose.yml` (default: `password`).
+   Edit `docker/config.json` — set `Database.Host` to `"db"` and `Database.Password` to match `docker-compose.yml` (default: `password`). The example config is minimal; see `config.reference.json` for all available options.
 
 2. Place your [quest/scenario files](https://files.catbox.moe/xf0l7w.7z) in `docker/bin/`.
 

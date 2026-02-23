@@ -21,7 +21,7 @@ Thank you for your interest in contributing to Erupe! This guide will help you g
    ```
 
 3. Set up the database following the [Installation guide](README.md#installation)
-4. Copy `config.example.json` to `config.json` and configure it
+4. Copy `config.example.json` to `config.json` and set your database password (see `config.reference.json` for all available options)
 5. Install dependencies:
 
    ```bash
