@@ -85,6 +85,7 @@ type Config struct {
 	EarthMonsters          []int32
 	SaveDumps              SaveDumpOptions
 	Screenshots            ScreenshotsOptions
+	Capture                CaptureOptions
 
 	DebugOptions    DebugOptions
 	GameplayOptions GameplayOptions
@@ -110,6 +111,16 @@ type ScreenshotsOptions struct {
 	Port          uint32 // Port for screenshots API
 	OutputDir     string
 	UploadQuality int //Determines the upload quality to the server
+}
+
+// CaptureOptions controls protocol packet capture recording.
+type CaptureOptions struct {
+	Enabled         bool     // Enable packet capture
+	OutputDir       string   // Directory for .mhfr capture files
+	ExcludeOpcodes  []uint16 // Opcodes to exclude from capture (e.g., ping, nop, position)
+	CaptureSign     bool     // Capture sign server sessions
+	CaptureEntrance bool     // Capture entrance server sessions
+	CaptureChannel  bool     // Capture channel server sessions
 }
 
 // DebugOptions holds various debug/temporary options for use while developing Erupe.
@@ -327,6 +338,12 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("DevModeOptions.SaveDumps", SaveDumpOptions{
 		Enabled:   true,
 		OutputDir: "save-backups",
+	})
+	viper.SetDefault("Capture", CaptureOptions{
+		OutputDir:       "captures",
+		CaptureSign:     true,
+		CaptureEntrance: true,
+		CaptureChannel:  true,
 	})
 	viper.SetDefault("LoopDelay", 50)
 

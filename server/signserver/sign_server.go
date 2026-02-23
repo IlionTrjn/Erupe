@@ -104,13 +104,21 @@ func (s *Server) handleConnection(conn net.Conn) {
 	}
 
 	// Create a new session.
+	var cc network.Conn = network.NewCryptConn(conn, s.erupeConfig.RealClientMode, s.logger)
+	cc, captureCleanup := startSignCapture(s, cc, conn.RemoteAddr())
+
 	session := &Session{
-		logger:    s.logger,
-		server:    s,
-		rawConn:   conn,
-		cryptConn: network.NewCryptConn(conn, s.erupeConfig.RealClientMode, s.logger),
+		logger:         s.logger,
+		server:         s,
+		rawConn:        conn,
+		cryptConn:      cc,
+		captureCleanup: captureCleanup,
 	}
 
 	// Do the session's work.
 	session.work()
+
+	if session.captureCleanup != nil {
+		session.captureCleanup()
+	}
 }

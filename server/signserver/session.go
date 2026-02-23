@@ -27,12 +27,13 @@ const (
 // Session holds state for the sign server connection.
 type Session struct {
 	sync.Mutex
-	logger    *zap.Logger
-	server    *Server
-	rawConn   net.Conn
-	cryptConn *network.CryptConn
-	client    client
-	psn       string
+	logger         *zap.Logger
+	server         *Server
+	rawConn        net.Conn
+	cryptConn      network.Conn
+	client         client
+	psn            string
+	captureCleanup func()
 }
 
 func (s *Session) work() {

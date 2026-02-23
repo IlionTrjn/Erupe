@@ -283,6 +283,11 @@ func logoutPlayer(s *Session) {
 		}
 	}
 
+	// Flush and close capture file before closing the connection.
+	if s.captureCleanup != nil {
+		s.captureCleanup()
+	}
+
 	// NOW do cleanup (after save is complete)
 	s.server.Lock()
 	delete(s.server.sessions, s.rawConn)

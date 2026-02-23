@@ -31,6 +31,14 @@
     "RawEnabled": false,
     "OutputDir": "save-backups"
   },
+  "Capture": {
+    "Enabled": false,
+    "OutputDir": "captures",
+    "ExcludeOpcodes": [],
+    "CaptureSign": true,
+    "CaptureEntrance": true,
+    "CaptureChannel": true
+  },
   "DebugOptions": {
     "CleanDB": false,
     "MaxLauncherHR": false,

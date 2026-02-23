@@ -108,7 +108,10 @@ func (s *Server) handleEntranceServerConnection(conn net.Conn) {
 	}
 
 	// Create a new encrypted connection handler and read a packet from it.
-	cc := network.NewCryptConn(conn, s.erupeConfig.RealClientMode, s.logger)
+	var cc network.Conn = network.NewCryptConn(conn, s.erupeConfig.RealClientMode, s.logger)
+	cc, captureCleanup := startEntranceCapture(s, cc, conn.RemoteAddr())
+	defer captureCleanup()
+
 	pkt, err := cc.ReadPacket()
 	if err != nil {
 		s.logger.Warn("Error reading packet", zap.Error(err))

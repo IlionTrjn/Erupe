@@ -16,6 +16,7 @@ import (
 	"erupe-ce/network"
 	"erupe-ce/network/clientctx"
 	"erupe-ce/network/mhfpacket"
+	"erupe-ce/network/pcap"
 
 	"go.uber.org/zap"
 )
@@ -70,18 +71,23 @@ type Session struct {
 	// Contains the mail list that maps accumulated indexes to mail IDs
 	mailList []int
 
-	Name     string
-	closed   atomic.Bool
-	ackStart map[uint32]time.Time
+	Name           string
+	closed         atomic.Bool
+	ackStart       map[uint32]time.Time
+	captureCleanup func() // Called on session close to flush/close capture file
 }
 
 // NewSession creates a new Session type.
 func NewSession(server *Server, conn net.Conn) *Session {
+	var cryptConn network.Conn = network.NewCryptConn(conn, server.erupeConfig.RealClientMode, server.logger.Named(conn.RemoteAddr().String()))
+
+	cryptConn, captureCleanup := startCapture(server, cryptConn, conn.RemoteAddr(), pcap.ServerTypeChannel)
+
 	s := &Session{
 		logger:         server.logger.Named(conn.RemoteAddr().String()),
 		server:         server,
 		rawConn:        conn,
-		cryptConn:      network.NewCryptConn(conn, server.erupeConfig.RealClientMode, server.logger.Named(conn.RemoteAddr().String())),
+		cryptConn:      cryptConn,
 		sendPackets:    make(chan packet, 20),
 		clientContext:  &clientctx.ClientContext{RealClientMode: server.erupeConfig.RealClientMode},
 		lastPacket:     time.Now(),
@@ -90,6 +96,7 @@ func NewSession(server *Server, conn net.Conn) *Session {
 		stageMoveStack: stringstack.New(),
 		ackStart:       make(map[uint32]time.Time),
 		semaphoreID:    make([]uint16, 2),
+		captureCleanup: captureCleanup,
 	}
 	return s
 }
