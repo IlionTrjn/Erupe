@@ -461,6 +461,7 @@ func TestHandleMsgMhfGetAchievement_Success(t *testing.T) {
 		scores: [33]int32{5, 0, 20, 0, 0, 0, 0, 1}, // A few non-zero scores
 	}
 	server.achievementRepo = mock
+	ensureAchievementService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfGetAchievement{
@@ -492,6 +493,7 @@ func TestHandleMsgMhfGetAchievement_DBError(t *testing.T) {
 		getScoresErr: errNotFound,
 	}
 	server.achievementRepo = mock
+	ensureAchievementService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfGetAchievement{
@@ -516,6 +518,7 @@ func TestHandleMsgMhfGetAchievement_AllZeroScores(t *testing.T) {
 	server := createMockServer()
 	mock := &mockAchievementRepo{} // All scores default to 0
 	server.achievementRepo = mock
+	ensureAchievementService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfGetAchievement{
@@ -539,6 +542,7 @@ func TestHandleMsgMhfAddAchievement_Valid(t *testing.T) {
 	server := createMockServer()
 	mock := &mockAchievementRepo{}
 	server.achievementRepo = mock
+	ensureAchievementService(server)
 	session := createMockSession(42, server)
 
 	pkt := &mhfpacket.MsgMhfAddAchievement{
@@ -559,6 +563,7 @@ func TestHandleMsgMhfAddAchievement_OutOfRange(t *testing.T) {
 	server := createMockServer()
 	mock := &mockAchievementRepo{}
 	server.achievementRepo = mock
+	ensureAchievementService(server)
 	session := createMockSession(42, server)
 
 	pkt := &mhfpacket.MsgMhfAddAchievement{
@@ -576,6 +581,7 @@ func TestHandleMsgMhfAddAchievement_BoundaryID32(t *testing.T) {
 	server := createMockServer()
 	mock := &mockAchievementRepo{}
 	server.achievementRepo = mock
+	ensureAchievementService(server)
 	session := createMockSession(42, server)
 
 	pkt := &mhfpacket.MsgMhfAddAchievement{

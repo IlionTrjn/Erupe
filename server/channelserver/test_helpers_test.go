@@ -61,6 +61,11 @@ func ensureGuildService(s *Server) {
 	s.guildService = NewGuildService(s.guildRepo, s.mailRepo, s.charRepo, s.logger)
 }
 
+// ensureAchievementService wires the AchievementService from the server's current repos.
+func ensureAchievementService(s *Server) {
+	s.achievementService = NewAchievementService(s.achievementRepo, s.logger)
+}
+
 // createMockSession creates a minimal Session for testing.
 // Imported from v9.2.x-stable and adapted for main.
 func createMockSession(charID uint32, server *Server) *Session {

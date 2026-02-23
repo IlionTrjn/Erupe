@@ -1,10 +1,10 @@
 package channelserver
 
 import (
-	"erupe-ce/common/byteframe"
-	"erupe-ce/network/mhfpacket"
 	"io"
 
+	"erupe-ce/common/byteframe"
+	"erupe-ce/network/mhfpacket"
 	"go.uber.org/zap"
 )
 
@@ -97,33 +97,25 @@ func GetAchData(id uint8, score int32) Achievement {
 func handleMsgMhfGetAchievement(s *Session, p mhfpacket.MHFPacket) {
 	pkt := p.(*mhfpacket.MsgMhfGetAchievement)
 
-	if err := s.server.achievementRepo.EnsureExists(pkt.CharID); err != nil {
-		s.logger.Error("Failed to ensure achievements record", zap.Error(err))
-	}
-
-	scores, err := s.server.achievementRepo.GetAllScores(pkt.CharID)
+	summary, err := s.server.achievementService.GetAll(pkt.CharID)
 	if err != nil {
 		doAckBufSucceed(s, pkt.AckHandle, make([]byte, 20))
 		return
 	}
 
 	resp := byteframe.NewByteFrame()
-	var points uint32
 	resp.WriteBytes(make([]byte, 16))
 	resp.WriteBytes([]byte{0x02, 0x00, 0x00}) // Unk
 
-	var id uint8
-	entries := uint8(33)
-	resp.WriteUint8(entries) // Entry count
-	for id = 0; id < entries; id++ {
-		achData := GetAchData(id, scores[id])
-		points += achData.Value
+	resp.WriteUint8(achievementEntryCount)
+	for id := uint8(0); id < achievementEntryCount; id++ {
+		ach := summary.Achievements[id]
 		resp.WriteUint8(id)
-		resp.WriteUint8(achData.Level)
-		resp.WriteUint16(achData.NextValue)
-		resp.WriteUint32(achData.Required)
+		resp.WriteUint8(ach.Level)
+		resp.WriteUint16(ach.NextValue)
+		resp.WriteUint32(ach.Required)
 		resp.WriteBool(false) // TODO: Notify on rank increase since last checked, see MhfDisplayedAchievement
-		resp.WriteUint8(achData.Trophy)
+		resp.WriteUint8(ach.Trophy)
 		/* Trophy bitfield
 		0000 0000
 		abcd efgh
@@ -132,13 +124,13 @@ func handleMsgMhfGetAchievement(s *Session, p mhfpacket.MHFPacket) {
 		B-H - Gold (0x7F)
 		*/
 		resp.WriteUint16(0) // Unk
-		resp.WriteUint32(achData.Progress)
+		resp.WriteUint32(ach.Progress)
 	}
 	_, _ = resp.Seek(0, io.SeekStart)
-	resp.WriteUint32(points)
-	resp.WriteUint32(points)
-	resp.WriteUint32(points)
-	resp.WriteUint32(points)
+	resp.WriteUint32(summary.Points)
+	resp.WriteUint32(summary.Points)
+	resp.WriteUint32(summary.Points)
+	resp.WriteUint32(summary.Points)
 	doAckBufSucceed(s, pkt.AckHandle, resp.Data())
 }
 
@@ -151,16 +143,9 @@ func handleMsgMhfResetAchievement(s *Session, p mhfpacket.MHFPacket) {}
 
 func handleMsgMhfAddAchievement(s *Session, p mhfpacket.MHFPacket) {
 	pkt := p.(*mhfpacket.MsgMhfAddAchievement)
-	if pkt.AchievementID > 32 {
-		return
-	}
 
-	if err := s.server.achievementRepo.EnsureExists(s.charID); err != nil {
-		s.logger.Error("Failed to ensure achievements record", zap.Error(err))
-	}
-
-	if err := s.server.achievementRepo.IncrementScore(s.charID, pkt.AchievementID); err != nil {
-		s.logger.Error("Failed to update achievement score", zap.Error(err))
+	if err := s.server.achievementService.Increment(s.charID, pkt.AchievementID); err != nil {
+		s.logger.Warn("Failed to increment achievement", zap.Error(err))
 	}
 }
 
