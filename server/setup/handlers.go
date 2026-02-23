@@ -1,13 +1,14 @@
 package setup
 
 import (
-	"database/sql"
 	"embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"path/filepath"
 
+	"erupe-ce/server/migrations"
+
+	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"go.uber.org/zap"
 )
@@ -73,16 +74,14 @@ func (ws *wizardServer) handleTestDB(w http.ResponseWriter, r *http.Request) {
 
 // initDBRequest is the JSON body for POST /api/setup/init-db.
 type initDBRequest struct {
-	Host       string `json:"host"`
-	Port       int    `json:"port"`
-	User       string `json:"user"`
-	Password   string `json:"password"`
-	DBName     string `json:"dbName"`
-	CreateDB   bool   `json:"createDB"`
-	ApplyInit  bool   `json:"applyInit"`
-	ApplyUpdate bool  `json:"applyUpdate"`
-	ApplyPatch bool   `json:"applyPatch"`
-	ApplyBundled bool `json:"applyBundled"`
+	Host         string `json:"host"`
+	Port         int    `json:"port"`
+	User         string `json:"user"`
+	Password     string `json:"password"`
+	DBName       string `json:"dbName"`
+	CreateDB     bool   `json:"createDB"`
+	ApplySchema  bool   `json:"applySchema"`
+	ApplyBundled bool   `json:"applyBundled"`
 }
 
 func (ws *wizardServer) handleInitDB(w http.ResponseWriter, r *http.Request) {
@@ -108,23 +107,12 @@ func (ws *wizardServer) handleInitDB(w http.ResponseWriter, r *http.Request) {
 		addLog("Database created successfully")
 	}
 
-	if req.ApplyInit {
-		addLog("Applying init schema (pg_restore)...")
-		if err := applyInitSchema(req.Host, req.Port, req.User, req.Password, req.DBName); err != nil {
-			addLog(fmt.Sprintf("ERROR: %s", err))
-			writeJSON(w, http.StatusOK, map[string]interface{}{"success": false, "log": log})
-			return
-		}
-		addLog("Init schema applied successfully")
-	}
-
-	// For update/patch/bundled schemas, connect to the target DB.
-	if req.ApplyUpdate || req.ApplyPatch || req.ApplyBundled {
+	if req.ApplySchema || req.ApplyBundled {
 		connStr := fmt.Sprintf(
 			"host='%s' port='%d' user='%s' password='%s' dbname='%s' sslmode=disable",
 			req.Host, req.Port, req.User, req.Password, req.DBName,
 		)
-		db, err := sql.Open("postgres", connStr)
+		db, err := sqlx.Open("postgres", connStr)
 		if err != nil {
 			addLog(fmt.Sprintf("ERROR connecting to database: %s", err))
 			writeJSON(w, http.StatusOK, map[string]interface{}{"success": false, "log": log})
@@ -132,37 +120,26 @@ func (ws *wizardServer) handleInitDB(w http.ResponseWriter, r *http.Request) {
 		}
 		defer func() { _ = db.Close() }()
 
-		applyDir := func(dir, label string) bool {
-			addLog(fmt.Sprintf("Applying %s schemas from %s...", label, dir))
-			applied, err := applySQLFiles(db, filepath.Join("schemas", dir))
-			for _, f := range applied {
-				addLog(fmt.Sprintf("  Applied: %s", f))
-			}
+		if req.ApplySchema {
+			addLog("Running database migrations...")
+			applied, err := migrations.Migrate(db, ws.logger)
 			if err != nil {
 				addLog(fmt.Sprintf("ERROR: %s", err))
-				return false
+				writeJSON(w, http.StatusOK, map[string]interface{}{"success": false, "log": log})
+				return
 			}
-			addLog(fmt.Sprintf("%s schemas applied (%d files)", label, len(applied)))
-			return true
+			addLog(fmt.Sprintf("Schema migrations applied (%d migration(s))", applied))
 		}
 
-		if req.ApplyUpdate {
-			if !applyDir("update-schema", "update") {
-				writeJSON(w, http.StatusOK, map[string]interface{}{"success": false, "log": log})
-				return
-			}
-		}
-		if req.ApplyPatch {
-			if !applyDir("patch-schema", "patch") {
-				writeJSON(w, http.StatusOK, map[string]interface{}{"success": false, "log": log})
-				return
-			}
-		}
 		if req.ApplyBundled {
-			if !applyDir("bundled-schema", "bundled") {
+			addLog("Applying bundled data (shops, events, gacha)...")
+			applied, err := migrations.ApplySeedData(db, ws.logger)
+			if err != nil {
+				addLog(fmt.Sprintf("ERROR: %s", err))
 				writeJSON(w, http.StatusOK, map[string]interface{}{"success": false, "log": log})
 				return
 			}
+			addLog(fmt.Sprintf("Bundled data applied (%d files)", applied))
 		}
 	}
 

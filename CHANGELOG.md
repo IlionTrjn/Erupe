@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Embedded auto-migrating database schema system (`server/migrations/`): the server binary now contains all SQL schemas and runs migrations automatically on startup — no more `pg_restore`, manual patch ordering, or external `schemas/` directory needed
 - Setup wizard: web-based first-run configuration at `http://localhost:8080` when `config.json` is missing — guides users through database connection, schema initialization, and server settings
 - CI: Coverage threshold enforcement — fails build if total coverage drops below 50%
 - CI: Release workflow that automatically builds and uploads Linux/Windows binaries to GitHub Releases on tag push
@@ -25,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Schema management consolidated: replaced 4 independent code paths (Docker shell script, setup wizard, test helpers, manual psql) with a single embedded migration runner
+- Setup wizard simplified: 3 schema checkboxes replaced with single "Apply database schema" checkbox
+- Docker simplified: removed schema volume mounts and init script — the server binary handles everything
+- Test helpers simplified: `ApplyTestSchema` now uses the migration runner instead of `pg_restore` + manual patch application
 - Updated minimum Go version requirement from 1.23 to 1.25
 - Improved config handling
 - Refactored logout flow to save all data before cleanup (prevents data loss race conditions)

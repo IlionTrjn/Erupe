@@ -16,7 +16,6 @@ RUN adduser -D -h /app erupe
 WORKDIR /app
 
 COPY --from=builder /build/erupe-ce .
-COPY --from=builder /build/schemas/ ./schemas/
 
 # www/ and bin/ are mounted at runtime if needed
 

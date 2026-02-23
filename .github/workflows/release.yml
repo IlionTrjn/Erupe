@@ -45,9 +45,7 @@ jobs:
         cp config.example.json staging/
         cp -r www/ staging/www/
         cp -r savedata/ staging/savedata/
-        cp -r schemas/ staging/schemas/
-        # Create a standalone SCHEMA.sql from init schema for convenience
-        cp schemas/init.sql staging/SCHEMA.sql
+        # Schema is now embedded in the binary via server/migrations/
         cd staging && zip -r ../erupe-${{ matrix.os_name }}.zip .
 
     - name: Upload build artifact
@@ -70,8 +68,8 @@ jobs:
       with:
         path: artifacts
 
-    - name: Copy SCHEMA.sql for standalone download
-      run: cp schemas/init.sql SCHEMA.sql
+    - name: Copy standalone schema for download
+      run: cp server/migrations/sql/0001_init.sql SCHEMA.sql
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2

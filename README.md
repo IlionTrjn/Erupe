@@ -51,27 +51,21 @@ Docker handles the database automatically. You only need to provide quest files 
 2. Set up PostgreSQL and create a database:
 
    ```bash
-   wget https://github.com/Mezeporta/Erupe/releases/latest/download/SCHEMA.sql
-   psql -U postgres -d erupe -f SCHEMA.sql
+   createdb -U postgres erupe
    ```
 
-3. Apply any patch schemas from [schemas/patch-schema/](./schemas/patch-schema/) in numerical order:
+   The server will automatically apply all schema migrations on first startup.
 
-   ```bash
-   psql -U postgres -d erupe -f schemas/patch-schema/01-example-patch.sql
-   # Repeat for each patch file
-   ```
-
-4. Copy and edit the config:
+3. Copy and edit the config:
 
    ```bash
    cp config.example.json config.json
    # Edit config.json with your database credentials
    ```
 
-5. Download [quest/scenario files](#quest--scenario-files) and extract them to `bin/`
+4. Download [quest/scenario files](#quest--scenario-files) and extract them to `bin/`
 
-6. Run: `./erupe-ce`
+5. Run: `./erupe-ce`
 
 ### Option C: From Source
 
@@ -124,7 +118,7 @@ go mod tidy
 go build -o erupe-ce
 ```
 
-**Check for new patch schemas** in [schemas/patch-schema/](./schemas/patch-schema/) after pulling — apply any you haven't run yet, in numerical order.
+Database schema migrations are applied automatically when the server starts — no manual SQL steps needed.
 
 ### Docker
 
@@ -134,8 +128,6 @@ docker compose down
 docker compose build
 docker compose up
 ```
-
-Apply any new patch schemas via pgAdmin or `psql` into the running container.
 
 ## Configuration
 
@@ -210,7 +202,7 @@ Erupe uses a structured schema system:
 - **Initialization Schema**: Bootstraps database to version 9.1.0
 - **Update Schemas**: Production-ready updates for new releases
 - **Patch Schemas**: Development updates (subject to change)
-- **Bundled Schemas**: Demo templates for shops, distributions, events, and gacha in [schemas/bundled-schema/](./schemas/bundled-schema/)
+- **Seed Data**: Demo templates for shops, distributions, events, and gacha in [server/migrations/seed/](./server/migrations/seed/)
 
 **Note**: Only use patch schemas if you're following active development. They get consolidated into update schemas on release.
 

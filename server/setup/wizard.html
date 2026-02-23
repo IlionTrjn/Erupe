@@ -122,9 +122,7 @@ h1{font-size:1.75rem;margin-bottom:.5rem;color:#e94560;text-align:center}
   <p style="font-size:.85rem;color:#888;margin-bottom:1rem">Select which schema operations to perform.</p>
   <div id="schema-options">
     <label class="checkbox" id="chk-create-db-label"><input type="checkbox" id="chk-create-db" checked> Create database</label>
-    <label class="checkbox"><input type="checkbox" id="chk-init" checked> Apply init schema (pg_restore — required for new databases)</label>
-    <label class="checkbox"><input type="checkbox" id="chk-update" checked> Apply update schemas</label>
-    <label class="checkbox"><input type="checkbox" id="chk-patch" checked> Apply patch schemas (development patches)</label>
+    <label class="checkbox"><input type="checkbox" id="chk-schema" checked> Apply database schema (required for new databases)</label>
     <label class="checkbox"><input type="checkbox" id="chk-bundled" checked> Apply bundled data (shops, events, gacha — recommended)</label>
   </div>
   <button class="btn btn-primary" id="btn-init-db" onclick="initDB()">Initialize Database</button>
@@ -208,9 +206,9 @@ function updateSchemaOptions() {
     createCheck.disabled = false;
     createLabel.style.opacity = '1';
   }
-  // If tables already exist, uncheck init
+  // If tables already exist, uncheck schema (migrations will detect and skip)
   if (dbTestResult && dbTestResult.tablesExist) {
-    document.getElementById('chk-init').checked = false;
+    document.getElementById('chk-schema').checked = false;
   }
 }
 
@@ -283,9 +281,7 @@ async function initDB() {
         password: document.getElementById('db-password').value,
         dbName: document.getElementById('db-name').value,
         createDB: document.getElementById('chk-create-db').checked,
-        applyInit: document.getElementById('chk-init').checked,
-        applyUpdate: document.getElementById('chk-update').checked,
-        applyPatch: document.getElementById('chk-patch').checked,
+        applySchema: document.getElementById('chk-schema').checked,
         applyBundled: document.getElementById('chk-bundled').checked,
       })
     });

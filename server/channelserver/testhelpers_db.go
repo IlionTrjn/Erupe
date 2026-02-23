@@ -3,17 +3,16 @@ package channelserver
 import (
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"erupe-ce/server/channelserver/compression/nullcomp"
+	"erupe-ce/server/migrations"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"go.uber.org/zap"
 )
 
 var (
@@ -104,147 +103,14 @@ func CleanTestDB(t *testing.T, db *sqlx.DB) {
 	}
 }
 
-// ApplyTestSchema applies the database schema from init.sql using pg_restore
+// ApplyTestSchema applies the database schema using the embedded migration system.
 func ApplyTestSchema(t *testing.T, db *sqlx.DB) {
 	t.Helper()
 
-	// Find the project root (where schemas/ directory is located)
-	projectRoot := findProjectRoot(t)
-	schemaPath := filepath.Join(projectRoot, "schemas", "init.sql")
-
-	// Get the connection config
-	config := DefaultTestDBConfig()
-
-	// Use pg_restore to load the schema dump
-	// The init.sql file is a pg_dump custom format, so we need pg_restore
-	cmd := exec.Command("pg_restore",
-		"-h", config.Host,
-		"-p", config.Port,
-		"-U", config.User,
-		"-d", config.DBName,
-		"--no-owner",
-		"--no-acl",
-		schemaPath,
-	)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", config.Password))
-
-	output, err := cmd.CombinedOutput()
+	logger, _ := zap.NewDevelopment()
+	_, err := migrations.Migrate(db, logger.Named("test-migrations"))
 	if err != nil {
-		out := string(output)
-		// pg_restore reports non-fatal warnings (version mismatches, already exists) as errors.
-		// Only fail if we see no "errors ignored on restore" summary, which means a real failure.
-		if !strings.Contains(out, "errors ignored on restore") {
-			t.Fatalf("pg_restore failed: %v\n%s", err, out)
-		}
-		t.Logf("pg_restore completed with non-fatal warnings (ignored)")
-	}
-
-	// Apply the 9.2 update schema (init.sql bootstraps to 9.1.0)
-	applyUpdateSchema(t, db, projectRoot)
-
-	// Apply patch schemas in order
-	applyPatchSchemas(t, db, projectRoot)
-}
-
-// applyUpdateSchema applies the 9.2 update schema that bridges init.sql (v9.1.0) to v9.2.0.
-// It runs each statement individually to tolerate partial failures (e.g. role references).
-func applyUpdateSchema(t *testing.T, db *sqlx.DB, projectRoot string) {
-	t.Helper()
-
-	updatePath := filepath.Join(projectRoot, "schemas", "update-schema", "9.2-update.sql")
-	updateSQL, err := os.ReadFile(updatePath)
-	if err != nil {
-		t.Logf("Warning: Could not read 9.2 update schema: %v", err)
-		return
-	}
-
-	// Strip the outer BEGIN/END transaction wrapper so we can run statements individually.
-	content := string(updateSQL)
-	content = strings.Replace(content, "BEGIN;", "", 1)
-	// Remove trailing END; (last occurrence)
-	if idx := strings.LastIndex(content, "END;"); idx >= 0 {
-		content = content[:idx] + content[idx+4:]
-	}
-
-	// Split on semicolons and execute each statement, tolerating errors from
-	// role references or already-applied changes.
-	for _, stmt := range strings.Split(content, ";") {
-		stmt = strings.TrimSpace(stmt)
-		if stmt == "" {
-			continue
-		}
-		_, _ = db.Exec(stmt) // Errors expected for role mismatches, already-applied changes, etc.
-	}
-}
-
-// applyPatchSchemas applies all patch schema files in numeric order
-func applyPatchSchemas(t *testing.T, db *sqlx.DB, projectRoot string) {
-	t.Helper()
-
-	patchDir := filepath.Join(projectRoot, "schemas", "patch-schema")
-	entries, err := os.ReadDir(patchDir)
-	if err != nil {
-		t.Logf("Warning: Could not read patch-schema directory: %v", err)
-		return
-	}
-
-	// Sort patch files numerically
-	var patchFiles []string
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
-			patchFiles = append(patchFiles, entry.Name())
-		}
-	}
-	sort.Strings(patchFiles)
-
-	// Apply each patch in its own transaction
-	for _, filename := range patchFiles {
-		patchPath := filepath.Join(patchDir, filename)
-		patchSQL, err := os.ReadFile(patchPath)
-		if err != nil {
-			t.Logf("Warning: Failed to read patch file %s: %v", filename, err)
-			continue
-		}
-
-		// Start a new transaction for each patch
-		tx, err := db.Begin()
-		if err != nil {
-			t.Logf("Warning: Failed to start transaction for patch %s: %v", filename, err)
-			continue
-		}
-
-		_, err = tx.Exec(string(patchSQL))
-		if err != nil {
-			_ = tx.Rollback()
-			t.Logf("Warning: Failed to apply patch %s: %v", filename, err)
-			// Continue with other patches even if one fails
-		} else {
-			_ = tx.Commit()
-		}
-	}
-}
-
-// findProjectRoot finds the project root directory by looking for the schemas directory
-func findProjectRoot(t *testing.T) string {
-	t.Helper()
-
-	// Start from current directory and walk up
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get working directory: %v", err)
-	}
-
-	for {
-		schemasPath := filepath.Join(dir, "schemas")
-		if stat, err := os.Stat(schemasPath); err == nil && stat.IsDir() {
-			return dir
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Fatal("Could not find project root (schemas directory not found)")
-		}
-		dir = parent
+		t.Fatalf("Failed to apply schema migrations: %v", err)
 	}
 }
 

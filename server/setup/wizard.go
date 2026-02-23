@@ -6,10 +6,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"sort"
-	"strings"
 )
 
 // clientModes returns all supported client version strings.
@@ -373,71 +369,3 @@ func createDatabase(host string, port int, user, password, dbName string) error 
 	return nil
 }
 
-// applyInitSchema runs pg_restore to load the init.sql (PostgreSQL custom dump format).
-func applyInitSchema(host string, port int, user, password, dbName string) error {
-	pgRestore, err := exec.LookPath("pg_restore")
-	if err != nil {
-		return fmt.Errorf("pg_restore not found in PATH: %w (install PostgreSQL client tools)", err)
-	}
-
-	schemaPath := filepath.Join("schemas", "init.sql")
-	if _, err := os.Stat(schemaPath); err != nil {
-		return fmt.Errorf("schema file not found: %s", schemaPath)
-	}
-
-	cmd := exec.Command(pgRestore,
-		"--host", host,
-		"--port", fmt.Sprint(port),
-		"--username", user,
-		"--dbname", dbName,
-		"--no-owner",
-		"--no-privileges",
-		schemaPath,
-	)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", password))
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("pg_restore failed: %w\n%s", err, string(output))
-	}
-	return nil
-}
-
-// collectSQLFiles returns sorted .sql filenames from a directory.
-func collectSQLFiles(dir string) ([]string, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("reading directory %s: %w", dir, err)
-	}
-	var files []string
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql") {
-			files = append(files, e.Name())
-		}
-	}
-	sort.Strings(files)
-	return files, nil
-}
-
-// applySQLFiles executes all .sql files in a directory in sorted order.
-func applySQLFiles(db *sql.DB, dir string) ([]string, error) {
-	files, err := collectSQLFiles(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	var applied []string
-	for _, f := range files {
-		path := filepath.Join(dir, f)
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return applied, fmt.Errorf("reading %s: %w", f, err)
-		}
-		_, err = db.Exec(string(data))
-		if err != nil {
-			return applied, fmt.Errorf("executing %s: %w", f, err)
-		}
-		applied = append(applied, f)
-	}
-	return applied, nil
-}

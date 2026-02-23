@@ -1,6 +1,0 @@
-BEGIN;
-
-ALTER TABLE IF EXISTS public.guilds
-    ADD COLUMN IF NOT EXISTS weekly_bonus_users INT NOT NULL DEFAULT 0;
-
-END;

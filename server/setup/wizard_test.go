@@ -130,44 +130,6 @@ func TestClientModes(t *testing.T) {
 	}
 }
 
-func TestApplySQLFiles(t *testing.T) {
-	// This test doesn't need a real database — we test the file reading/sorting logic
-	// by verifying it returns errors when the directory doesn't exist.
-	_, err := applySQLFiles(nil, "/nonexistent/path")
-	if err == nil {
-		t.Error("expected error for nonexistent directory")
-	}
-}
-
-func TestApplySQLFilesOrdering(t *testing.T) {
-	// Verify that collectSQLFiles returns files in sorted order and skips non-.sql files.
-	dir := t.TempDir()
-	files := []string{"03_c.sql", "01_a.sql", "02_b.sql"}
-	for _, f := range files {
-		if err := os.WriteFile(filepath.Join(dir, f), []byte("-- "+f), 0644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	// Non-SQL file should be skipped
-	if err := os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("not sql"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	collected, err := collectSQLFiles(dir)
-	if err != nil {
-		t.Fatalf("collectSQLFiles failed: %v", err)
-	}
-	if len(collected) != 3 {
-		t.Fatalf("got %d files, want 3", len(collected))
-	}
-	expected := []string{"01_a.sql", "02_b.sql", "03_c.sql"}
-	for i, f := range collected {
-		if f != expected[i] {
-			t.Errorf("file[%d] = %q, want %q", i, f, expected[i])
-		}
-	}
-}
-
 func TestWriteConfig(t *testing.T) {
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()

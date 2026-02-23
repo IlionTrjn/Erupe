@@ -16,6 +16,7 @@ import (
 	"erupe-ce/server/channelserver"
 	"erupe-ce/server/discordbot"
 	"erupe-ce/server/entranceserver"
+	"erupe-ce/server/migrations"
 	"erupe-ce/server/setup"
 	"erupe-ce/server/signserver"
 	"strings"
@@ -153,6 +154,16 @@ func main() {
 	db.SetConnMaxIdleTime(2 * time.Minute)
 
 	logger.Info("Database: Started successfully")
+
+	// Run database migrations
+	applied, migErr := migrations.Migrate(db, logger.Named("migrations"))
+	if migErr != nil {
+		preventClose(config, fmt.Sprintf("Database migration failed: %s", migErr.Error()))
+	}
+	if applied > 0 {
+		ver, _ := migrations.Version(db)
+		logger.Info(fmt.Sprintf("Database: Applied %d migration(s), now at version %d", applied, ver))
+	}
 
 	// Pre-compute all server IDs this instance will own, so we only
 	// delete our own rows (safe for multi-instance on the same DB).
