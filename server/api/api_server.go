@@ -63,6 +63,7 @@ func (s *APIServer) Start() error {
 	r.HandleFunc("/character/export", s.ExportSave)
 	r.HandleFunc("/api/ss/bbs/upload.php", s.ScreenShot)
 	r.HandleFunc("/api/ss/bbs/{id}", s.ScreenShotGet)
+	r.HandleFunc("/", s.LandingPage)
 	r.HandleFunc("/health", s.Health)
 	r.HandleFunc("/version", s.Version)
 	handler := handlers.CORS(handlers.AllowedHeaders([]string{"Content-Type"}))(r)

@@ -215,7 +215,12 @@
     "PatchServer": "",
     "Banners": [],
     "Messages": [],
-    "Links": []
+    "Links": [],
+    "LandingPage": {
+      "Enabled": true,
+      "Title": "My Frontier Server",
+      "Content": "<p>Welcome! Download the client from our <a href=\"https://discord.gg/example\">Discord</a>.</p>"
+    }
   },
   "Channel": {
     "Enabled": true

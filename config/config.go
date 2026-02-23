@@ -254,6 +254,14 @@ type API struct {
 	Banners     []APISignBanner
 	Messages    []APISignMessage
 	Links       []APISignLink
+	LandingPage LandingPage
+}
+
+// LandingPage holds config for the browser-facing landing page at /.
+type LandingPage struct {
+	Enabled bool   // Toggle the landing page on/off
+	Title   string // Page title (e.g. "My Frontier Server")
+	Content string // Body content — supports raw HTML
 }
 
 type APISignBanner struct {
