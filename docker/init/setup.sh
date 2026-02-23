@@ -14,6 +14,14 @@ done
 
 echo "Patching!"
 for file in /schemas/patch-schema/*; do
+  [ -f "$file" ] || continue
+  echo "  Applying $file"
+  psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -1 -f "$file"
+done
+
+echo "Loading bundled data (shops, events, gacha)..."
+for file in /schemas/bundled-schema/*; do
+  [ -f "$file" ] || continue
   echo "  Applying $file"
   psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -1 -f "$file"
 done

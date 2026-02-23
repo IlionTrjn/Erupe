@@ -58,7 +58,7 @@ Docker handles the database automatically. You only need to provide quest files 
 3. Apply any patch schemas from [schemas/patch-schema/](./schemas/patch-schema/) in numerical order:
 
    ```bash
-   psql -U postgres -d erupe -f schemas/patch-schema/01_patch.sql
+   psql -U postgres -d erupe -f schemas/patch-schema/01-example-patch.sql
    # Repeat for each patch file
    ```
 
@@ -159,7 +159,7 @@ Edit `config.json` before starting the server. The essential settings are:
 
 | Setting | Description |
 |---------|-------------|
-| `Host` | Bind address. Use `127.0.0.1` for local, `0.0.0.0` for remote access |
+| `Host` | IP advertised to clients. Use `127.0.0.1` for local play, your LAN/WAN IP for remote. Leave blank in config to auto-detect |
 | `ClientMode` | Target client version (`ZZ`, `G10`, `Forward4`, etc.) |
 | `BinPath` | Path to quest/scenario files |
 | `Language` | `"en"` or `"jp"` |
