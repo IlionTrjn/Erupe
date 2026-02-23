@@ -16,6 +16,7 @@ import (
 	"erupe-ce/server/channelserver"
 	"erupe-ce/server/discordbot"
 	"erupe-ce/server/entranceserver"
+	"erupe-ce/server/setup"
 	"erupe-ce/server/signserver"
 	"strings"
 
@@ -79,11 +80,18 @@ func main() {
 
 	config, cfgErr := cfg.LoadConfig()
 	if cfgErr != nil {
-		fmt.Println("\nFailed to start Erupe:\n" + fmt.Sprintf("Failed to load config: %s", cfgErr.Error()))
-		go wait()
-		fmt.Println("\nPress Enter/Return to exit...")
-		_, _ = fmt.Scanln()
-		os.Exit(0)
+		if _, err := os.Stat("config.json"); os.IsNotExist(err) {
+			logger.Info("No config.json found, launching setup wizard")
+			if err := setup.Run(logger.Named("setup"), 8080); err != nil {
+				logger.Fatal("Setup wizard failed", zap.Error(err))
+			}
+			config, cfgErr = cfg.LoadConfig()
+			if cfgErr != nil {
+				logger.Fatal("Config still invalid after setup", zap.Error(cfgErr))
+			}
+		} else {
+			preventClose(config, fmt.Sprintf("Failed to load config: %s", cfgErr.Error()))
+		}
 	}
 
 	logger.Info(fmt.Sprintf("Starting Erupe (9.3b-%s)", Commit()))

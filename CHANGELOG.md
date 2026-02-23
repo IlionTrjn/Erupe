@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Setup wizard: web-based first-run configuration at `http://localhost:8080` when `config.json` is missing — guides users through database connection, schema initialization, and server settings
 - CI: Coverage threshold enforcement — fails build if total coverage drops below 50%
 - CI: Release workflow that automatically builds and uploads Linux/Windows binaries to GitHub Releases on tag push
 - Monthly guild item claim tracking per character per type (standard/HLC/EXC), with schema migration (`31-monthly-items.sql`) adding claim timestamps to the `stamps` table
