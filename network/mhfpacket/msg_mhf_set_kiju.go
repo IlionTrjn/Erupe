@@ -24,7 +24,6 @@ func (m *MsgMhfSetKiju) Parse(bf *byteframe.ByteFrame, ctx *clientctx.ClientCont
 	m.AckHandle = bf.ReadUint32()
 	m.Unk1 = bf.ReadUint16()
 	return nil
-	//panic("Not implemented")
 }
 
 // Build builds a binary packet from the current data.
