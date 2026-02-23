@@ -18,6 +18,7 @@ func TestAnswerGuildScout_Accept(t *testing.T) {
 	guildMock.guild.LeaderCharID = 50
 	server.guildRepo = guildMock
 	server.mailRepo = mailMock
+	ensureGuildService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfAnswerGuildScout{
@@ -52,6 +53,7 @@ func TestAnswerGuildScout_Decline(t *testing.T) {
 	guildMock.guild.LeaderCharID = 50
 	server.guildRepo = guildMock
 	server.mailRepo = mailMock
+	ensureGuildService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfAnswerGuildScout{
@@ -76,6 +78,7 @@ func TestAnswerGuildScout_GuildNotFound(t *testing.T) {
 	guildMock.getErr = errNotFound
 	server.guildRepo = guildMock
 	server.mailRepo = &mockMailRepo{}
+	ensureGuildService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfAnswerGuildScout{
@@ -104,6 +107,7 @@ func TestAnswerGuildScout_ApplicationMissing(t *testing.T) {
 	guildMock.guild.LeaderCharID = 50
 	server.guildRepo = guildMock
 	server.mailRepo = mailMock
+	ensureGuildService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfAnswerGuildScout{
@@ -136,6 +140,7 @@ func TestAnswerGuildScout_MailError(t *testing.T) {
 	guildMock.guild.LeaderCharID = 50
 	server.guildRepo = guildMock
 	server.mailRepo = mailMock
+	ensureGuildService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfAnswerGuildScout{

@@ -17,6 +17,7 @@ func TestOperateGuild_Disband_Success(t *testing.T) {
 	guildMock.guild = &Guild{ID: 10}
 	guildMock.guild.LeaderCharID = 1
 	server.guildRepo = guildMock
+	ensureGuildService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfOperateGuild{
@@ -49,6 +50,7 @@ func TestOperateGuild_Disband_NotLeader(t *testing.T) {
 	guildMock.guild = &Guild{ID: 10}
 	guildMock.guild.LeaderCharID = 999 // different from session charID
 	server.guildRepo = guildMock
+	ensureGuildService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfOperateGuild{
@@ -79,6 +81,7 @@ func TestOperateGuild_Disband_RepoError(t *testing.T) {
 	guildMock.guild = &Guild{ID: 10}
 	guildMock.guild.LeaderCharID = 1
 	server.guildRepo = guildMock
+	ensureGuildService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfOperateGuild{
@@ -109,6 +112,7 @@ func TestOperateGuild_Resign_TransferLeadership(t *testing.T) {
 		{CharID: 2, OrderIndex: 2, AvoidLeadership: false},
 	}
 	server.guildRepo = guildMock
+	ensureGuildService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfOperateGuild{
@@ -149,6 +153,7 @@ func TestOperateGuild_Resign_SkipsAvoidLeadership(t *testing.T) {
 		{CharID: 3, OrderIndex: 3, AvoidLeadership: false},
 	}
 	server.guildRepo = guildMock
+	ensureGuildService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfOperateGuild{
@@ -230,6 +235,7 @@ func TestOperateGuild_Leave_AsApplicant(t *testing.T) {
 	guildMock.guild.LeaderCharID = 999
 	server.guildRepo = guildMock
 	server.mailRepo = mailMock
+	ensureGuildService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfOperateGuild{
@@ -258,6 +264,7 @@ func TestOperateGuild_Leave_AsMember(t *testing.T) {
 	guildMock.guild.LeaderCharID = 999
 	server.guildRepo = guildMock
 	server.mailRepo = mailMock
+	ensureGuildService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfOperateGuild{
@@ -289,6 +296,7 @@ func TestOperateGuild_Leave_MailError(t *testing.T) {
 	guildMock.guild.LeaderCharID = 999
 	server.guildRepo = guildMock
 	server.mailRepo = mailMock
+	ensureGuildService(server)
 	session := createMockSession(1, server)
 
 	pkt := &mhfpacket.MsgMhfOperateGuild{

@@ -1,8 +1,6 @@
 package channelserver
 
 import (
-	"fmt"
-	"sort"
 	"time"
 
 	"erupe-ce/common/byteframe"
@@ -29,41 +27,16 @@ func handleMsgMhfOperateGuild(s *Session, p mhfpacket.MHFPacket) {
 
 	switch pkt.Action {
 	case mhfpacket.OperateGuildDisband:
-		response := 1
-		if guild.LeaderCharID != s.charID {
-			s.logger.Warn("Unauthorized guild management attempt", zap.Uint32("charID", s.charID), zap.Uint32("guildID", guild.ID))
-			response = 0
-		} else {
-			err = s.server.guildRepo.Disband(guild.ID)
-			if err != nil {
-				response = 0
-			}
+		result, _ := s.server.guildService.Disband(s.charID, guild.ID)
+		response := 0
+		if result != nil && result.Success {
+			response = 1
 		}
 		bf.WriteUint32(uint32(response))
 	case mhfpacket.OperateGuildResign:
-		guildMembers, err := s.server.guildRepo.GetMembers(guild.ID, false)
-		if err == nil {
-			sort.Slice(guildMembers[:], func(i, j int) bool {
-				return guildMembers[i].OrderIndex < guildMembers[j].OrderIndex
-			})
-			for i := 1; i < len(guildMembers); i++ {
-				if !guildMembers[i].AvoidLeadership {
-					guild.LeaderCharID = guildMembers[i].CharID
-					guildMembers[0].OrderIndex = guildMembers[i].OrderIndex
-					guildMembers[i].OrderIndex = 1
-					if err := s.server.guildRepo.SaveMember(guildMembers[0]); err != nil {
-						s.logger.Error("Failed to save former leader member data", zap.Error(err))
-					}
-					if err := s.server.guildRepo.SaveMember(guildMembers[i]); err != nil {
-						s.logger.Error("Failed to save new leader member data", zap.Error(err))
-					}
-					bf.WriteUint32(guildMembers[i].CharID)
-					break
-				}
-			}
-			if err := s.server.guildRepo.Save(guild); err != nil {
-				s.logger.Error("Failed to save guild after leadership resign", zap.Error(err))
-			}
+		result, err := s.server.guildService.ResignLeadership(s.charID, guild.ID)
+		if err == nil && result.NewLeaderCharID != 0 {
+			bf.WriteUint32(result.NewLeaderCharID)
 		}
 	case mhfpacket.OperateGuildApply:
 		err = s.server.guildRepo.CreateApplication(guild.ID, s.charID, s.charID, GuildApplicationTypeApplied)
@@ -73,20 +46,10 @@ func handleMsgMhfOperateGuild(s *Session, p mhfpacket.MHFPacket) {
 			bf.WriteUint32(0)
 		}
 	case mhfpacket.OperateGuildLeave:
-		if characterGuildInfo.IsApplicant {
-			err = s.server.guildRepo.RejectApplication(guild.ID, s.charID)
-		} else {
-			err = s.server.guildRepo.RemoveCharacter(s.charID)
-		}
-		response := 1
-		if err != nil {
-			response = 0
-		} else {
-			if err := s.server.mailRepo.SendMail(0, s.charID, "Withdrawal",
-				fmt.Sprintf("You have withdrawn from 「%s」.", guild.Name),
-				0, 0, false, true); err != nil {
-				s.logger.Warn("Failed to send guild withdrawal notification", zap.Error(err))
-			}
+		result, _ := s.server.guildService.Leave(s.charID, guild.ID, characterGuildInfo.IsApplicant, guild.Name)
+		response := 0
+		if result != nil && result.Success {
+			response = 1
 		}
 		bf.WriteUint32(uint32(response))
 	case mhfpacket.OperateGuildDonateRank:
