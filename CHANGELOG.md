@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Session lifecycle logging with duration and metrics tracking
 - Structured logging with timing metrics for all database save operations
 - Plate data (transmog) safety net in logout flow - adds monitoring checkpoint for platedata, platebox, and platemyset persistence
+- Unit tests for `handlers_data_paper.go`: 20 tests covering all DataType branches, ACK payload structure, serialization round-trips, and paperGiftData table integrity
 
 ### Changed
 

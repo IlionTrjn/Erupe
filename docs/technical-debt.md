@@ -35,11 +35,10 @@ These TODOs represent features that are visibly broken for players.
 
 ### 2. Test gaps on critical paths
 
-**Handler files with no test file (6 remaining):**
+**Handler files with no test file (5 remaining):**
 
 | File | Priority | Reason |
 |------|----------|--------|
-| `handlers_data_paper.go` | MEDIUM | Daily paper data |
 | `handlers_seibattle.go` | MEDIUM | Sei battle system |
 | `handlers_scenario.go` | LOW | Mostly complete, uses repo |
 | `handlers_distitem.go` | LOW | Distribution items |
@@ -86,6 +85,7 @@ Items resolved since the original audit:
 | — | **Monthly guild item claim** (`handlers_guild.go:389`) | Now tracks per-character per-type monthly claims via `stamps` table. |
 | — | **Handler test coverage (4 files)** | Tests added for `handlers_session.go`, `handlers_gacha.go`, `handlers_plate.go`, `handlers_shop.go`. |
 | — | **Handler test coverage (`handlers_commands.go`)** | 62 tests covering all 12 commands, disabled-command gating, op overrides, error paths, raviente with semaphore, course enable/disable/locked, reload with players/objects. |
+| — | **Handler test coverage (`handlers_data_paper.go`)** | 20 tests covering all DataType branches (0/5/6/gift/>1000/unknown), ACK payload structure, earth succeed entry counts, timetable content, serialization round-trips, and paperGiftData table integrity. |
 | — | **Entrance server raw SQL** | Refactored to repository interfaces (`repo_interfaces.go`, `repo_session.go`, `repo_server.go`). |
 | — | **Guild daily RP rollover** (`handlers_guild_ops.go:148`) | Implemented via lazy rollover in `handlers_guild.go:110-119` using `RolloverDailyRP()`. Stale TODO removed. |
 | — | **Typos** (`sys_session.go`, `handlers_session.go`) | "For Debuging" and "offical" typos already fixed in previous commits. |
