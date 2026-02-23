@@ -12,6 +12,11 @@ const (
 
 	// HeaderSize is the fixed size of the file header in bytes.
 	HeaderSize = 32
+
+	// MinMetadataSize is the minimum metadata block size in bytes.
+	// Metadata is padded to at least this size to allow in-place patching
+	// (e.g., adding CharID/UserID after login).
+	MinMetadataSize = 512
 )
 
 // Direction indicates whether a packet was sent or received.

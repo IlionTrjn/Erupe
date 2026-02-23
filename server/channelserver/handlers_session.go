@@ -76,6 +76,10 @@ func handleMsgSysLogin(s *Session, p mhfpacket.MHFPacket) {
 	}
 	s.userID = userID
 
+	if s.captureConn != nil {
+		s.captureConn.SetSessionInfo(s.charID, s.userID)
+	}
+
 	bf := byteframe.NewByteFrame()
 	bf.WriteUint32(uint32(TimeAdjusted().Unix())) // Unix timestamp
 

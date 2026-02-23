@@ -64,7 +64,7 @@ func startSignCapture(s *Server, conn network.Conn, remoteAddr net.Addr) (networ
 
 	s.logger.Info("Capture started", zap.String("file", path))
 
-	rc := pcap.NewRecordingConn(conn, w, startNs)
+	rc := pcap.NewRecordingConn(conn, w, startNs, capCfg.ExcludeOpcodes)
 	cleanup := func() {
 		if err := w.Flush(); err != nil {
 			s.logger.Warn("Failed to flush capture", zap.Error(err))

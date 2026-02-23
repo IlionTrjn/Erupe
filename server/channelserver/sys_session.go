@@ -74,14 +74,15 @@ type Session struct {
 	Name           string
 	closed         atomic.Bool
 	ackStart       map[uint32]time.Time
-	captureCleanup func() // Called on session close to flush/close capture file
+	captureConn    *pcap.RecordingConn // non-nil when capture is active
+	captureCleanup func()              // Called on session close to flush/close capture file
 }
 
 // NewSession creates a new Session type.
 func NewSession(server *Server, conn net.Conn) *Session {
 	var cryptConn network.Conn = network.NewCryptConn(conn, server.erupeConfig.RealClientMode, server.logger.Named(conn.RemoteAddr().String()))
 
-	cryptConn, captureCleanup := startCapture(server, cryptConn, conn.RemoteAddr(), pcap.ServerTypeChannel)
+	cryptConn, captureConn, captureCleanup := startCapture(server, cryptConn, conn.RemoteAddr(), pcap.ServerTypeChannel)
 
 	s := &Session{
 		logger:         server.logger.Named(conn.RemoteAddr().String()),
@@ -96,6 +97,7 @@ func NewSession(server *Server, conn net.Conn) *Session {
 		stageMoveStack: stringstack.New(),
 		ackStart:       make(map[uint32]time.Time),
 		semaphoreID:    make([]uint16, 2),
+		captureConn:    captureConn,
 		captureCleanup: captureCleanup,
 	}
 	return s

@@ -3,6 +3,7 @@ package pcap
 import (
 	"bytes"
 	"io"
+	"os"
 	"testing"
 )
 
@@ -249,6 +250,100 @@ func TestDirectionString(t *testing.T) {
 	}
 	if Direction(0xFF).String() != "???" {
 		t.Errorf("unknown direction = %q", Direction(0xFF).String())
+	}
+}
+
+func TestMetadataPadding(t *testing.T) {
+	var buf bytes.Buffer
+
+	hdr := FileHeader{
+		Version:        FormatVersion,
+		ServerType:     ServerTypeChannel,
+		ClientMode:     40,
+		SessionStartNs: 1000,
+	}
+	meta := SessionMetadata{Host: "127.0.0.1"}
+
+	_, err := NewWriter(&buf, hdr, meta)
+	if err != nil {
+		t.Fatalf("NewWriter: %v", err)
+	}
+
+	// The metadata block should be at least MinMetadataSize.
+	data := buf.Bytes()
+	if len(data) < HeaderSize+MinMetadataSize {
+		t.Errorf("file size %d < HeaderSize+MinMetadataSize (%d)", len(data), HeaderSize+MinMetadataSize)
+	}
+}
+
+func TestPatchMetadata(t *testing.T) {
+	// Create a capture file with initial metadata.
+	f, err := os.CreateTemp(t.TempDir(), "test-patch-*.mhfr")
+	if err != nil {
+		t.Fatalf("CreateTemp: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	hdr := FileHeader{
+		Version:        FormatVersion,
+		ServerType:     ServerTypeChannel,
+		ClientMode:     40,
+		SessionStartNs: 1000,
+	}
+	meta := SessionMetadata{Host: "127.0.0.1", Port: 54001}
+
+	w, err := NewWriter(f, hdr, meta)
+	if err != nil {
+		t.Fatalf("NewWriter: %v", err)
+	}
+	// Write a packet so we can verify it survives patching.
+	if err := w.WritePacket(PacketRecord{
+		TimestampNs: 2000, Direction: DirClientToServer, Opcode: 0x0013, Payload: []byte{0x00, 0x13},
+	}); err != nil {
+		t.Fatalf("WritePacket: %v", err)
+	}
+	if err := w.Flush(); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+
+	// Patch metadata with CharID/UserID.
+	patched := SessionMetadata{
+		Host:   "127.0.0.1",
+		Port:   54001,
+		CharID: 42,
+		UserID: 7,
+	}
+	if err := PatchMetadata(f, patched); err != nil {
+		t.Fatalf("PatchMetadata: %v", err)
+	}
+
+	// Re-read from the beginning.
+	if _, err := f.Seek(0, 0); err != nil {
+		t.Fatalf("Seek: %v", err)
+	}
+	r, err := NewReader(f)
+	if err != nil {
+		t.Fatalf("NewReader: %v", err)
+	}
+
+	// Verify patched metadata.
+	if r.Meta.CharID != 42 {
+		t.Errorf("CharID = %d, want 42", r.Meta.CharID)
+	}
+	if r.Meta.UserID != 7 {
+		t.Errorf("UserID = %d, want 7", r.Meta.UserID)
+	}
+	if r.Meta.Host != "127.0.0.1" {
+		t.Errorf("Host = %q, want %q", r.Meta.Host, "127.0.0.1")
+	}
+
+	// Verify packet survived.
+	rec, err := r.ReadPacket()
+	if err != nil {
+		t.Fatalf("ReadPacket: %v", err)
+	}
+	if rec.Opcode != 0x0013 {
+		t.Errorf("Opcode = 0x%04X, want 0x0013", rec.Opcode)
 	}
 }
 

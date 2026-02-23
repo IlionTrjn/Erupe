@@ -19,6 +19,15 @@ func NewWriter(w io.Writer, header FileHeader, meta SessionMetadata) (*Writer, e
 	if err != nil {
 		return nil, fmt.Errorf("pcap: marshal metadata: %w", err)
 	}
+	// Pad metadata to MinMetadataSize so PatchMetadata can update it in-place.
+	if len(metaBytes) < MinMetadataSize {
+		padded := make([]byte, MinMetadataSize)
+		copy(padded, metaBytes)
+		for i := len(metaBytes); i < MinMetadataSize; i++ {
+			padded[i] = ' '
+		}
+		metaBytes = padded
+	}
 	header.MetadataLen = uint32(len(metaBytes))
 
 	bw := bufio.NewWriter(w)

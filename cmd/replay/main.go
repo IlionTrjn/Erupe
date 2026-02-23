@@ -5,29 +5,35 @@
 //	replay --capture file.mhfr --mode dump     # Human-readable text output
 //	replay --capture file.mhfr --mode json     # JSON export
 //	replay --capture file.mhfr --mode stats    # Opcode histogram, duration, counts
-//	replay --capture file.mhfr --mode replay --target 127.0.0.1:54001  # Replay against live server
+//	replay --capture file.mhfr --mode replay --target 127.0.0.1:54001 --no-auth  # Replay against live server
 package main
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"sort"
+	"sync"
 	"time"
 
+	"erupe-ce/cmd/protbot/conn"
 	"erupe-ce/network"
 	"erupe-ce/network/pcap"
 )
+
+// MSG_SYS_PING opcode for auto-responding to server pings.
+const opcodeSysPing = 0x0017
 
 func main() {
 	capturePath := flag.String("capture", "", "Path to .mhfr capture file (required)")
 	mode := flag.String("mode", "dump", "Mode: dump, json, stats, replay")
 	target := flag.String("target", "", "Target server address for replay mode (host:port)")
 	speed := flag.Float64("speed", 1.0, "Replay speed multiplier (e.g. 2.0 = 2x faster)")
-	_ = target // used in replay mode
-	_ = speed
+	noAuth := flag.Bool("no-auth", false, "Skip auth token patching (requires DisableTokenCheck on server)")
+	_ = noAuth // currently only no-auth mode is supported
 	flag.Parse()
 
 	if *capturePath == "" {
@@ -57,8 +63,10 @@ func main() {
 			fmt.Fprintln(os.Stderr, "error: --target is required for replay mode")
 			os.Exit(1)
 		}
-		fmt.Fprintln(os.Stderr, "replay mode not yet implemented (requires live server connection)")
-		os.Exit(1)
+		if err := runReplay(*capturePath, *target, *speed); err != nil {
+			fmt.Fprintf(os.Stderr, "replay failed: %v\n", err)
+			os.Exit(1)
+		}
 	default:
 		fmt.Fprintf(os.Stderr, "unknown mode: %s\n", *mode)
 		os.Exit(1)
@@ -91,6 +99,129 @@ func readAllPackets(r *pcap.Reader) ([]pcap.PacketRecord, error) {
 		records = append(records, rec)
 	}
 	return records, nil
+}
+
+func runReplay(path, target string, speed float64) error {
+	r, f, err := openCapture(path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+
+	records, err := readAllPackets(r)
+	if err != nil {
+		return err
+	}
+
+	c2s := pcap.FilterByDirection(records, pcap.DirClientToServer)
+	expectedS2C := pcap.FilterByDirection(records, pcap.DirServerToClient)
+
+	if len(c2s) == 0 {
+		fmt.Println("No C→S packets in capture, nothing to replay.")
+		return nil
+	}
+
+	fmt.Printf("=== Replay: %s ===\n", path)
+	fmt.Printf("Server type: %s  Target: %s  Speed: %.1fx\n", r.Header.ServerType, target, speed)
+	fmt.Printf("C→S packets to send: %d  Expected S→C responses: %d\n\n", len(c2s), len(expectedS2C))
+
+	// Connect based on server type.
+	var mhf *conn.MHFConn
+	switch r.Header.ServerType {
+	case pcap.ServerTypeChannel:
+		mhf, err = conn.DialDirect(target)
+	default:
+		mhf, err = conn.DialWithInit(target)
+	}
+	if err != nil {
+		return fmt.Errorf("connect to %s: %w", target, err)
+	}
+
+	// Collect S→C responses concurrently.
+	var actualS2C []pcap.PacketRecord
+	var mu sync.Mutex
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+		for {
+			pkt, err := mhf.ReadPacket()
+			if err != nil {
+				return
+			}
+
+			var opcode uint16
+			if len(pkt) >= 2 {
+				opcode = binary.BigEndian.Uint16(pkt[:2])
+			}
+
+			// Auto-respond to ping to keep connection alive.
+			if opcode == opcodeSysPing {
+				pong := buildPingResponse()
+				_ = mhf.SendPacket(pong)
+			}
+
+			mu.Lock()
+			actualS2C = append(actualS2C, pcap.PacketRecord{
+				TimestampNs: time.Now().UnixNano(),
+				Direction:   pcap.DirServerToClient,
+				Opcode:      opcode,
+				Payload:     pkt,
+			})
+			mu.Unlock()
+		}
+	}()
+
+	// Send C→S packets with timing.
+	var lastTs int64
+	for i, pkt := range c2s {
+		if i > 0 && speed > 0 {
+			delta := time.Duration(float64(pkt.TimestampNs-lastTs) / speed)
+			if delta > 0 {
+				time.Sleep(delta)
+			}
+		}
+		lastTs = pkt.TimestampNs
+		opcodeName := network.PacketID(pkt.Opcode).String()
+		fmt.Printf("[replay] #%d sending 0x%04X %-30s (%d bytes)\n", i, pkt.Opcode, opcodeName, len(pkt.Payload))
+		if err := mhf.SendPacket(pkt.Payload); err != nil {
+			fmt.Printf("[replay] send error: %v\n", err)
+			break
+		}
+	}
+
+	// Wait for remaining responses.
+	fmt.Println("\n[replay] All packets sent, waiting for remaining responses...")
+	time.Sleep(2 * time.Second)
+	_ = mhf.Close()
+	<-done
+
+	// Compare.
+	mu.Lock()
+	diffs := ComparePackets(expectedS2C, actualS2C)
+	mu.Unlock()
+
+	// Report.
+	fmt.Printf("\n=== Replay Results ===\n")
+	fmt.Printf("Sent: %d C→S packets\n", len(c2s))
+	fmt.Printf("Expected: %d S→C responses\n", len(expectedS2C))
+	fmt.Printf("Received: %d S→C responses\n", len(actualS2C))
+	fmt.Printf("Differences: %d\n\n", len(diffs))
+	for _, d := range diffs {
+		fmt.Println(d.String())
+	}
+
+	if len(diffs) == 0 {
+		fmt.Println("All responses match!")
+	}
+
+	return nil
+}
+
+// buildPingResponse builds a minimal MSG_SYS_PING response packet.
+// Format: [opcode 0x0017][0x00 0x10 terminator]
+func buildPingResponse() []byte {
+	return []byte{0x00, 0x17, 0x00, 0x10}
 }
 
 func runDump(path string) error {
