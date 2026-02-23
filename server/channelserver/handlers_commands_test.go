@@ -2,11 +2,20 @@ package channelserver
 
 import (
 	"errors"
+	"net"
+	"sync"
 	"testing"
 	"time"
 
+	"erupe-ce/common/mhfcourse"
 	cfg "erupe-ce/config"
+	"erupe-ce/network/clientctx"
+
+	"go.uber.org/zap"
 )
+
+// syncOnceForTest returns a fresh sync.Once to reset the package-level commandsOnce.
+func syncOnceForTest() sync.Once { return sync.Once{} }
 
 // --- mockUserRepoCommands ---
 
@@ -590,6 +599,623 @@ func TestParseChatCommand_Course_MissingArgs(t *testing.T) {
 	}
 }
 
+// --- Ban (additional) ---
+
+func TestParseChatCommand_Ban_InvalidDurationFormat(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{opResult: true}
+	s := createCommandSession(repo)
+
+	// "30x" has an unparseable format — Sscanf fails
+	parseChatCommand(s, "!ban 211111 badformat")
+
+	if repo.bannedUID != 0 {
+		t.Error("should not ban with invalid duration format")
+	}
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (error message)", n)
+	}
+}
+
+func TestParseChatCommand_Ban_BanUserError(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{
+		opResult:  true,
+		foundUID:  42,
+		foundName: "TestUser",
+		banErr:    errors.New("db error"),
+	}
+	s := createCommandSession(repo)
+
+	parseChatCommand(s, "!ban 211111")
+
+	// Ban is attempted (bannedUID set by mock) but returns error.
+	// The handler still sends a success message — it logs the error.
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1", n)
+	}
+}
+
+func TestParseChatCommand_Ban_WithExpiryBanError(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{
+		opResult:  true,
+		foundUID:  42,
+		foundName: "TestUser",
+		banErr:    errors.New("db error"),
+	}
+	s := createCommandSession(repo)
+
+	parseChatCommand(s, "!ban 211111 7d")
+
+	// Even with error, handler sends success message (logs the error)
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1", n)
+	}
+}
+
+func TestParseChatCommand_Ban_DurationLongForm(t *testing.T) {
+	tests := []struct {
+		name     string
+		duration string
+	}{
+		{"seconds_long", "10seconds"},
+		{"second_singular", "1second"},
+		{"minutes_long", "5minutes"},
+		{"minute_singular", "1minute"},
+		{"hours_long", "2hours"},
+		{"hour_singular", "1hour"},
+		{"days_long", "30days"},
+		{"day_singular", "1day"},
+		{"months_long", "6months"},
+		{"month_singular", "1month"},
+		{"years_long", "2years"},
+		{"year_singular", "1year"},
+		{"mi_alias", "15mi"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupCommandsMap(true)
+			repo := &mockUserRepoCommands{
+				opResult:  true,
+				foundUID:  1,
+				foundName: "User",
+			}
+			s := createCommandSession(repo)
+
+			parseChatCommand(s, "!ban 211111 "+tt.duration)
+
+			if repo.banExpiry == nil {
+				t.Errorf("expiry should not be nil for duration %s", tt.duration)
+			}
+		})
+	}
+}
+
+// --- Raviente (with semaphore) ---
+
+// addRaviSemaphore sets up a Raviente semaphore on the server so getRaviSemaphore() returns non-nil.
+func addRaviSemaphore(s *Server) {
+	s.semaphore = map[string]*Semaphore{
+		"hs_l0u3": {name: "hs_l0u3", clients: make(map[*Session]uint32)},
+	}
+}
+
+func TestParseChatCommand_Raviente_StartSuccess(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{}
+	s := createCommandSession(repo)
+	addRaviSemaphore(s.server)
+	s.server.raviente.register[1] = 0
+	s.server.raviente.register[3] = 100
+
+	parseChatCommand(s, "!ravi start")
+
+	if s.server.raviente.register[1] != 100 {
+		t.Errorf("register[1] = %d, want 100", s.server.raviente.register[1])
+	}
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1", n)
+	}
+}
+
+func TestParseChatCommand_Raviente_StartAlreadyStarted(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{}
+	s := createCommandSession(repo)
+	addRaviSemaphore(s.server)
+	s.server.raviente.register[1] = 50 // already started
+
+	parseChatCommand(s, "!ravi start")
+
+	if s.server.raviente.register[1] != 50 {
+		t.Errorf("register[1] should remain 50, got %d", s.server.raviente.register[1])
+	}
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (already started error)", n)
+	}
+}
+
+func TestParseChatCommand_Raviente_CheckMultiplier(t *testing.T) {
+	for _, alias := range []string{"cm", "check", "checkmultiplier", "multiplier"} {
+		t.Run(alias, func(t *testing.T) {
+			setupCommandsMap(true)
+			repo := &mockUserRepoCommands{}
+			s := createCommandSession(repo)
+			addRaviSemaphore(s.server)
+			// Add a client to the semaphore to avoid divide-by-zero in GetRaviMultiplier
+			sema := s.server.getRaviSemaphore()
+			sema.clients[s] = s.charID
+
+			parseChatCommand(s, "!ravi "+alias)
+
+			if n := drainChatResponses(s); n != 1 {
+				t.Errorf("chat responses = %d, want 1", n)
+			}
+		})
+	}
+}
+
+func TestParseChatCommand_Raviente_ZZCommands(t *testing.T) {
+	tests := []struct {
+		name    string
+		aliases []string
+	}{
+		{"sendres", []string{"sr", "sendres", "resurrection"}},
+		{"sendsed", []string{"ss", "sendsed"}},
+		{"reqsed", []string{"rs", "reqsed"}},
+	}
+
+	for _, tt := range tests {
+		for _, alias := range tt.aliases {
+			t.Run(tt.name+"/"+alias, func(t *testing.T) {
+				setupCommandsMap(true)
+				repo := &mockUserRepoCommands{}
+				s := createCommandSession(repo)
+				addRaviSemaphore(s.server)
+				s.server.erupeConfig.RealClientMode = cfg.ZZ
+				// Set up HP for sendsed/reqsed
+				s.server.raviente.state[0] = 100
+				s.server.raviente.state[28] = 1 // res support available
+
+				parseChatCommand(s, "!ravi "+alias)
+
+				if n := drainChatResponses(s); n != 1 {
+					t.Errorf("chat responses = %d, want 1", n)
+				}
+			})
+		}
+	}
+}
+
+func TestParseChatCommand_Raviente_ZZCommand_ResNoSupport(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{}
+	s := createCommandSession(repo)
+	addRaviSemaphore(s.server)
+	s.server.erupeConfig.RealClientMode = cfg.ZZ
+	s.server.raviente.state[28] = 0 // no support available
+
+	parseChatCommand(s, "!ravi sr")
+
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (res error)", n)
+	}
+}
+
+func TestParseChatCommand_Raviente_NonZZVersion(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{}
+	s := createCommandSession(repo)
+	addRaviSemaphore(s.server)
+	s.server.erupeConfig.RealClientMode = cfg.G10
+
+	parseChatCommand(s, "!ravi sr")
+
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (version error)", n)
+	}
+}
+
+func TestParseChatCommand_Raviente_UnknownSubcommand(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{}
+	s := createCommandSession(repo)
+	addRaviSemaphore(s.server)
+
+	parseChatCommand(s, "!ravi unknown")
+
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (error message)", n)
+	}
+}
+
+func TestParseChatCommand_Raviente_Disabled(t *testing.T) {
+	setupCommandsMap(false)
+	repo := &mockUserRepoCommands{opResult: false}
+	s := createCommandSession(repo)
+
+	parseChatCommand(s, "!ravi start")
+
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (disabled message)", n)
+	}
+}
+
+// --- Course (additional) ---
+
+func TestParseChatCommand_Course_EnableCourse(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{rightsVal: 0}
+	s := createCommandSession(repo)
+	// "Trial" is alias for course ID 1; config must list it as enabled
+	s.server.erupeConfig.Courses = []cfg.Course{{Name: "Trial", Enabled: true}}
+
+	parseChatCommand(s, "!course Trial")
+
+	if repo.setRightsVal == 0 {
+		t.Error("rights should be updated when enabling a course")
+	}
+	// 1 chat message (enabled) + 1 updateRights packet = 2
+	if n := drainChatResponses(s); n != 2 {
+		t.Errorf("packets = %d, want 2 (course enabled message + rights update)", n)
+	}
+}
+
+func TestParseChatCommand_Course_DisableCourse(t *testing.T) {
+	setupCommandsMap(true)
+	// Rights value = 2 means course ID 1 is active (2^1 = 2)
+	repo := &mockUserRepoCommands{rightsVal: 2}
+	s := createCommandSession(repo)
+	s.server.erupeConfig.Courses = []cfg.Course{{Name: "Trial", Enabled: true}}
+	// Pre-populate session courses so CourseExists returns true
+	s.courses = []mhfcourse.Course{{ID: 1}}
+
+	parseChatCommand(s, "!course Trial")
+
+	// 1 chat message (disabled) + 1 updateRights packet = 2
+	if n := drainChatResponses(s); n != 2 {
+		t.Errorf("packets = %d, want 2 (course disabled message + rights update)", n)
+	}
+}
+
+func TestParseChatCommand_Course_CaseInsensitive(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{rightsVal: 0}
+	s := createCommandSession(repo)
+	s.server.erupeConfig.Courses = []cfg.Course{{Name: "Trial", Enabled: true}}
+
+	parseChatCommand(s, "!course trial")
+
+	if repo.setRightsVal == 0 {
+		t.Error("course lookup should be case-insensitive")
+	}
+}
+
+func TestParseChatCommand_Course_AliasLookup(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{rightsVal: 0}
+	s := createCommandSession(repo)
+	s.server.erupeConfig.Courses = []cfg.Course{{Name: "Trial", Enabled: true}}
+
+	// "TL" is an alias for Trial (course ID 1)
+	parseChatCommand(s, "!course TL")
+
+	if repo.setRightsVal == 0 {
+		t.Error("course should be found by alias")
+	}
+}
+
+func TestParseChatCommand_Course_Locked(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{}
+	s := createCommandSession(repo)
+	// Course exists in game but NOT in config (or disabled in config)
+	s.server.erupeConfig.Courses = []cfg.Course{}
+
+	parseChatCommand(s, "!course Trial")
+
+	// Should get "locked" message, no rights update
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (locked message)", n)
+	}
+}
+
+func TestParseChatCommand_Course_Disabled(t *testing.T) {
+	setupCommandsMap(false)
+	repo := &mockUserRepoCommands{opResult: false}
+	s := createCommandSession(repo)
+
+	parseChatCommand(s, "!course Trial")
+
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (disabled message)", n)
+	}
+}
+
+// --- Reload ---
+
+func TestParseChatCommand_Reload_EmptyStage(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{}
+	s := createCommandSession(repo)
+	s.stage = &Stage{
+		id:      "test",
+		objects: make(map[uint32]*Object),
+		clients: make(map[*Session]uint32),
+	}
+
+	parseChatCommand(s, "!reload")
+
+	// With no other sessions/objects: 1 chat message + 2 queue sends (delete + insert notifs)
+	if n := drainChatResponses(s); n < 1 {
+		t.Errorf("packets = %d, want >= 1", n)
+	}
+}
+
+func TestParseChatCommand_Reload_WithOtherPlayersAndObjects(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{}
+	s := createCommandSession(repo)
+
+	// Create another session in the server
+	otherLogger, _ := zap.NewDevelopment()
+	other := &Session{
+		charID:        2,
+		clientContext: &clientctx.ClientContext{},
+		sendPackets:   make(chan packet, 20),
+		server:        s.server,
+		logger:        otherLogger,
+	}
+	s.server.sessions[&net.TCPConn{}] = other
+
+	// Stage with an object owned by the other session
+	s.stage = &Stage{
+		id: "test",
+		objects: map[uint32]*Object{
+			1: {id: 1, ownerCharID: 2, x: 1.0, y: 2.0, z: 3.0},
+			2: {id: 2, ownerCharID: s.charID}, // our own object — should be skipped
+		},
+		clients: map[*Session]uint32{s: s.charID, other: 2},
+	}
+
+	parseChatCommand(s, "!reload")
+
+	// Should get: chat message + delete notif + reload notif (3 packets)
+	if n := drainChatResponses(s); n != 3 {
+		t.Errorf("packets = %d, want 3 (chat + delete + reload)", n)
+	}
+}
+
+func TestParseChatCommand_Reload_Disabled(t *testing.T) {
+	setupCommandsMap(false)
+	repo := &mockUserRepoCommands{opResult: false}
+	s := createCommandSession(repo)
+
+	parseChatCommand(s, "!reload")
+
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (disabled message)", n)
+	}
+}
+
+// --- Help (additional) ---
+
+func TestParseChatCommand_Help_NonOpSeesOnlyEnabled(t *testing.T) {
+	// Set up: only some commands enabled, user is not op
+	commands = map[string]cfg.Command{
+		"Ban":      {Name: "Ban", Prefix: "ban", Enabled: false},
+		"Timer":    {Name: "Timer", Prefix: "timer", Enabled: true},
+		"PSN":      {Name: "PSN", Prefix: "psn", Enabled: true},
+		"Reload":   {Name: "Reload", Prefix: "reload", Enabled: false},
+		"KeyQuest": {Name: "KeyQuest", Prefix: "kqf", Enabled: false},
+		"Rights":   {Name: "Rights", Prefix: "rights", Enabled: false},
+		"Course":   {Name: "Course", Prefix: "course", Enabled: true},
+		"Raviente": {Name: "Raviente", Prefix: "ravi", Enabled: false},
+		"Teleport": {Name: "Teleport", Prefix: "tp", Enabled: false},
+		"Discord":  {Name: "Discord", Prefix: "discord", Enabled: true},
+		"Playtime": {Name: "Playtime", Prefix: "playtime", Enabled: true},
+		"Help":     {Name: "Help", Prefix: "help", Enabled: true},
+	}
+	repo := &mockUserRepoCommands{opResult: false}
+	s := createCommandSession(repo)
+
+	parseChatCommand(s, "!help")
+
+	// Count enabled commands
+	enabled := 0
+	for _, cmd := range commands {
+		if cmd.Enabled {
+			enabled++
+		}
+	}
+
+	count := drainChatResponses(s)
+	if count != enabled {
+		t.Errorf("help messages = %d, want %d (only enabled commands for non-op)", count, enabled)
+	}
+}
+
+func TestParseChatCommand_Help_OpSeesAll(t *testing.T) {
+	// Some disabled, but op sees all
+	commands = map[string]cfg.Command{
+		"Ban":      {Name: "Ban", Prefix: "ban", Enabled: false},
+		"Timer":    {Name: "Timer", Prefix: "timer", Enabled: true},
+		"PSN":      {Name: "PSN", Prefix: "psn", Enabled: false},
+		"Reload":   {Name: "Reload", Prefix: "reload", Enabled: false},
+		"KeyQuest": {Name: "KeyQuest", Prefix: "kqf", Enabled: false},
+		"Rights":   {Name: "Rights", Prefix: "rights", Enabled: false},
+		"Course":   {Name: "Course", Prefix: "course", Enabled: false},
+		"Raviente": {Name: "Raviente", Prefix: "ravi", Enabled: false},
+		"Teleport": {Name: "Teleport", Prefix: "tp", Enabled: false},
+		"Discord":  {Name: "Discord", Prefix: "discord", Enabled: false},
+		"Playtime": {Name: "Playtime", Prefix: "playtime", Enabled: false},
+		"Help":     {Name: "Help", Prefix: "help", Enabled: true},
+	}
+	repo := &mockUserRepoCommands{opResult: true}
+	s := createCommandSession(repo)
+
+	parseChatCommand(s, "!help")
+
+	count := drainChatResponses(s)
+	if count != len(commands) {
+		t.Errorf("help messages = %d, want %d (op sees all commands)", count, len(commands))
+	}
+}
+
+func TestParseChatCommand_Help_Disabled(t *testing.T) {
+	setupCommandsMap(false)
+	repo := &mockUserRepoCommands{opResult: false}
+	s := createCommandSession(repo)
+
+	parseChatCommand(s, "!help")
+
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (disabled message)", n)
+	}
+}
+
+// --- Rights (additional) ---
+
+func TestParseChatCommand_Rights_SetRightsError(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{}
+	s := createCommandSession(repo)
+
+	// Use a value that Atoi will parse but SetRights succeeds (no error mock needed here)
+	// Instead test the "invalid" case: non-numeric argument
+	parseChatCommand(s, "!rights notanumber")
+
+	// Atoi("notanumber") returns 0 — SetRights(0) succeeds, sends success message
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1", n)
+	}
+}
+
+func TestParseChatCommand_Rights_Disabled(t *testing.T) {
+	setupCommandsMap(false)
+	repo := &mockUserRepoCommands{opResult: false}
+	s := createCommandSession(repo)
+
+	parseChatCommand(s, "!rights 30")
+
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (disabled message)", n)
+	}
+}
+
+// --- Teleport (additional) ---
+
+func TestParseChatCommand_Teleport_NoArgs(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{}
+	s := createCommandSession(repo)
+
+	parseChatCommand(s, "!tp")
+
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (error message)", n)
+	}
+}
+
+func TestParseChatCommand_Teleport_Disabled(t *testing.T) {
+	setupCommandsMap(false)
+	repo := &mockUserRepoCommands{opResult: false}
+	s := createCommandSession(repo)
+
+	parseChatCommand(s, "!tp 100 200")
+
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (disabled message)", n)
+	}
+}
+
+// --- KeyQuest (additional) ---
+
+func TestParseChatCommand_KeyQuest_Disabled(t *testing.T) {
+	setupCommandsMap(false)
+	repo := &mockUserRepoCommands{opResult: false}
+	s := createCommandSession(repo)
+
+	parseChatCommand(s, "!kqf get")
+
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (disabled message)", n)
+	}
+}
+
+// --- PSN (additional) ---
+
+func TestParseChatCommand_PSN_Disabled(t *testing.T) {
+	setupCommandsMap(false)
+	repo := &mockUserRepoCommands{opResult: false}
+	s := createCommandSession(repo)
+
+	parseChatCommand(s, "!psn MyPSNID")
+
+	if repo.psnSetID != "" {
+		t.Error("PSN should not be set when command is disabled")
+	}
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (disabled message)", n)
+	}
+}
+
+// --- Discord (additional) ---
+
+func TestParseChatCommand_Discord_Disabled(t *testing.T) {
+	setupCommandsMap(false)
+	repo := &mockUserRepoCommands{opResult: false}
+	s := createCommandSession(repo)
+
+	parseChatCommand(s, "!discord")
+
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (disabled message)", n)
+	}
+}
+
+// --- Playtime (additional) ---
+
+func TestParseChatCommand_Playtime_Disabled(t *testing.T) {
+	setupCommandsMap(false)
+	repo := &mockUserRepoCommands{opResult: false}
+	s := createCommandSession(repo)
+	s.playtimeTime = time.Now()
+
+	parseChatCommand(s, "!playtime")
+
+	if n := drainChatResponses(s); n != 1 {
+		t.Errorf("chat responses = %d, want 1 (disabled message)", n)
+	}
+}
+
+// --- initCommands ---
+
+func TestInitCommands(t *testing.T) {
+	// Reset the sync.Once by replacing the package-level vars
+	commandsOnce = syncOnceForTest()
+	commands = nil
+
+	logger, _ := zap.NewDevelopment()
+	cmds := []cfg.Command{
+		{Name: "TestCmd", Prefix: "test", Enabled: true},
+		{Name: "Disabled", Prefix: "dis", Enabled: false},
+	}
+
+	initCommands(cmds, logger)
+
+	if len(commands) != 2 {
+		t.Fatalf("commands length = %d, want 2", len(commands))
+	}
+	if commands["TestCmd"].Prefix != "test" {
+		t.Errorf("TestCmd prefix = %q, want %q", commands["TestCmd"].Prefix, "test")
+	}
+	if commands["Disabled"].Enabled {
+		t.Error("Disabled command should not be enabled")
+	}
+}
+
 // --- sendServerChatMessage ---
 
 func TestSendServerChatMessage_CommandsContext(t *testing.T) {
@@ -600,6 +1226,34 @@ func TestSendServerChatMessage_CommandsContext(t *testing.T) {
 
 	if n := drainChatResponses(session); n != 1 {
 		t.Errorf("chat responses = %d, want 1", n)
+	}
+}
+
+// --- sendDisabledCommandMessage ---
+
+func TestSendDisabledCommandMessage(t *testing.T) {
+	server := createMockServer()
+	session := createMockSession(1, server)
+
+	sendDisabledCommandMessage(session, cfg.Command{Name: "TestCmd"})
+
+	if n := drainChatResponses(session); n != 1 {
+		t.Errorf("chat responses = %d, want 1", n)
+	}
+}
+
+// --- Unknown command ---
+
+func TestParseChatCommand_UnknownCommand(t *testing.T) {
+	setupCommandsMap(true)
+	repo := &mockUserRepoCommands{}
+	s := createCommandSession(repo)
+
+	// Command that doesn't match any registered prefix — should be a no-op
+	parseChatCommand(s, "!nonexistent")
+
+	if n := drainChatResponses(s); n != 0 {
+		t.Errorf("chat responses = %d, want 0 (unknown command is silent)", n)
 	}
 }
 

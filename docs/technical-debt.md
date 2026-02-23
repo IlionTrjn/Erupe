@@ -35,11 +35,10 @@ These TODOs represent features that are visibly broken for players.
 
 ### 2. Test gaps on critical paths
 
-**Handler files with no test file (7 remaining):**
+**Handler files with no test file (6 remaining):**
 
 | File | Priority | Reason |
 |------|----------|--------|
-| `handlers_commands.go` | HIGH | Admin command system |
 | `handlers_data_paper.go` | MEDIUM | Daily paper data |
 | `handlers_seibattle.go` | MEDIUM | Sei battle system |
 | `handlers_scenario.go` | LOW | Mostly complete, uses repo |
@@ -86,6 +85,7 @@ Items resolved since the original audit:
 | ~~7~~ | **`LoopDelay` config has no Viper default** | `viper.SetDefault("LoopDelay", 50)` added in `config/config.go`. |
 | — | **Monthly guild item claim** (`handlers_guild.go:389`) | Now tracks per-character per-type monthly claims via `stamps` table. |
 | — | **Handler test coverage (4 files)** | Tests added for `handlers_session.go`, `handlers_gacha.go`, `handlers_plate.go`, `handlers_shop.go`. |
+| — | **Handler test coverage (`handlers_commands.go`)** | 62 tests covering all 12 commands, disabled-command gating, op overrides, error paths, raviente with semaphore, course enable/disable/locked, reload with players/objects. |
 | — | **Entrance server raw SQL** | Refactored to repository interfaces (`repo_interfaces.go`, `repo_session.go`, `repo_server.go`). |
 | — | **Guild daily RP rollover** (`handlers_guild_ops.go:148`) | Implemented via lazy rollover in `handlers_guild.go:110-119` using `RolloverDailyRP()`. Stale TODO removed. |
 | — | **Typos** (`sys_session.go`, `handlers_session.go`) | "For Debuging" and "offical" typos already fixed in previous commits. |
@@ -97,7 +97,7 @@ Items resolved since the original audit:
 
 Based on remaining impact:
 
-1. **Add tests for `handlers_commands.go`** — highest-risk remaining untested handler (admin commands)
+1. ~~**Add tests for `handlers_commands.go`**~~ — **Done.** 62 tests covering all 12 commands (ban, timer, PSN, reload, key quest, rights, course, raviente, teleport, discord, playtime, help), disabled-command gating, op overrides, error paths, and `initCommands`.
 2. **Fix bookshelf data pointer** (`model_character.go`) — corrupts saves for three game versions (needs save data validation)
 3. **Fix achievement rank-up notifications** (`handlers_achievement.go:125`) — needs protocol research on `MhfDisplayedAchievement`
 4. **Add coverage threshold** to CI — prevents regressions
