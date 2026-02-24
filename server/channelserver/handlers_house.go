@@ -147,8 +147,8 @@ func handleMsgMhfLoadHouse(s *Session, p mhfpacket.MHFPacket) {
 		// Guild verification
 		if state > 3 {
 			ownGuild, err := s.server.guildRepo.GetByCharID(s.charID)
-			isApplicant, _ := s.server.guildRepo.HasApplication(ownGuild.ID, s.charID)
 			if err == nil && ownGuild != nil {
+				isApplicant, _ := s.server.guildRepo.HasApplication(ownGuild.ID, s.charID)
 				othersGuild, err := s.server.guildRepo.GetByCharID(pkt.CharID)
 				if err == nil && othersGuild != nil {
 					if othersGuild.ID == ownGuild.ID && !isApplicant {
@@ -164,7 +164,12 @@ func handleMsgMhfLoadHouse(s *Session, p mhfpacket.MHFPacket) {
 		}
 	}
 
-	houseTier, houseData, houseFurniture, bookshelf, gallery, tore, garden, _ := s.server.houseRepo.GetHouseContents(pkt.CharID)
+	houseTier, houseData, houseFurniture, bookshelf, gallery, tore, garden, err := s.server.houseRepo.GetHouseContents(pkt.CharID)
+	if err != nil {
+		s.logger.Error("Failed to get house contents", zap.Error(err), zap.Uint32("charID", pkt.CharID))
+		doAckSimpleFail(s, pkt.AckHandle, make([]byte, 4))
+		return
+	}
 	if houseFurniture == nil {
 		houseFurniture = make([]byte, 20)
 	}
@@ -201,7 +206,10 @@ func handleMsgMhfLoadHouse(s *Session, p mhfpacket.MHFPacket) {
 
 func handleMsgMhfGetMyhouseInfo(s *Session, p mhfpacket.MHFPacket) {
 	pkt := p.(*mhfpacket.MsgMhfGetMyhouseInfo)
-	data, _ := s.server.houseRepo.GetMission(s.charID)
+	data, err := s.server.houseRepo.GetMission(s.charID)
+	if err != nil {
+		s.logger.Error("Failed to get myhouse mission", zap.Error(err))
+	}
 	if len(data) > 0 {
 		doAckBufSucceed(s, pkt.AckHandle, data)
 	} else {
@@ -343,7 +351,10 @@ func handleMsgMhfOperateWarehouse(s *Session, p mhfpacket.MHFPacket) {
 	switch pkt.Operation {
 	case 0:
 		var count uint8
-		itemNames, equipNames, _ := s.server.houseRepo.GetWarehouseNames(s.charID)
+		itemNames, equipNames, err := s.server.houseRepo.GetWarehouseNames(s.charID)
+		if err != nil {
+			s.logger.Error("Failed to get warehouse names", zap.Error(err))
+		}
 		bf.WriteUint32(0)
 		bf.WriteUint16(10000) // Usages
 		temp := byteframe.NewByteFrame()

@@ -21,7 +21,12 @@ type GuildAdventure struct {
 
 func handleMsgMhfLoadGuildAdventure(s *Session, p mhfpacket.MHFPacket) {
 	pkt := p.(*mhfpacket.MsgMhfLoadGuildAdventure)
-	guild, _ := s.server.guildRepo.GetByCharID(s.charID)
+	guild, err := s.server.guildRepo.GetByCharID(s.charID)
+	if err != nil || guild == nil {
+		s.logger.Error("Failed to get guild for character", zap.Error(err))
+		doAckBufSucceed(s, pkt.AckHandle, make([]byte, 1))
+		return
+	}
 	adventures, err := s.server.guildRepo.ListAdventures(guild.ID)
 	if err != nil {
 		s.logger.Error("Failed to get guild adventures from db", zap.Error(err))
@@ -45,7 +50,12 @@ func handleMsgMhfLoadGuildAdventure(s *Session, p mhfpacket.MHFPacket) {
 
 func handleMsgMhfRegistGuildAdventure(s *Session, p mhfpacket.MHFPacket) {
 	pkt := p.(*mhfpacket.MsgMhfRegistGuildAdventure)
-	guild, _ := s.server.guildRepo.GetByCharID(s.charID)
+	guild, err := s.server.guildRepo.GetByCharID(s.charID)
+	if err != nil || guild == nil {
+		s.logger.Error("Failed to get guild for character", zap.Error(err))
+		doAckSimpleSucceed(s, pkt.AckHandle, make([]byte, 4))
+		return
+	}
 	if err := s.server.guildRepo.CreateAdventure(guild.ID, pkt.Destination, TimeAdjusted().Unix(), TimeAdjusted().Add(6*time.Hour).Unix()); err != nil {
 		s.logger.Error("Failed to register guild adventure", zap.Error(err))
 	}
@@ -70,7 +80,12 @@ func handleMsgMhfChargeGuildAdventure(s *Session, p mhfpacket.MHFPacket) {
 
 func handleMsgMhfRegistGuildAdventureDiva(s *Session, p mhfpacket.MHFPacket) {
 	pkt := p.(*mhfpacket.MsgMhfRegistGuildAdventureDiva)
-	guild, _ := s.server.guildRepo.GetByCharID(s.charID)
+	guild, err := s.server.guildRepo.GetByCharID(s.charID)
+	if err != nil || guild == nil {
+		s.logger.Error("Failed to get guild for character", zap.Error(err))
+		doAckSimpleSucceed(s, pkt.AckHandle, make([]byte, 4))
+		return
+	}
 	if err := s.server.guildRepo.CreateAdventureWithCharge(guild.ID, pkt.Destination, pkt.Charge, TimeAdjusted().Unix(), TimeAdjusted().Add(1*time.Hour).Unix()); err != nil {
 		s.logger.Error("Failed to register guild adventure", zap.Error(err))
 	}

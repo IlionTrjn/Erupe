@@ -53,7 +53,12 @@ func handleMsgMhfGetGachaPlayHistory(s *Session, p mhfpacket.MHFPacket) {
 
 func handleMsgMhfGetGachaPoint(s *Session, p mhfpacket.MHFPacket) {
 	pkt := p.(*mhfpacket.MsgMhfGetGachaPoint)
-	fp, gp, gt, _ := s.server.userRepo.GetGachaPoints(s.userID)
+	fp, gp, gt, err := s.server.userRepo.GetGachaPoints(s.userID)
+	if err != nil {
+		s.logger.Error("Failed to get gacha points", zap.Error(err))
+		doAckBufSucceed(s, pkt.AckHandle, make([]byte, 12))
+		return
+	}
 	resp := byteframe.NewByteFrame()
 	resp.WriteUint32(gp)
 	resp.WriteUint32(gt)
@@ -159,7 +164,10 @@ func handleMsgMhfPlayStepupGacha(s *Session, p mhfpacket.MHFPacket) {
 func handleMsgMhfGetStepupStatus(s *Session, p mhfpacket.MHFPacket) {
 	pkt := p.(*mhfpacket.MsgMhfGetStepupStatus)
 
-	status, _ := s.server.gachaService.GetStepupStatus(pkt.GachaID, s.charID, TimeAdjusted())
+	status, err := s.server.gachaService.GetStepupStatus(pkt.GachaID, s.charID, TimeAdjusted())
+	if err != nil {
+		s.logger.Error("Failed to get stepup status", zap.Error(err))
+	}
 
 	bf := byteframe.NewByteFrame()
 	bf.WriteUint8(status.Step)

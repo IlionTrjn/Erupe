@@ -32,7 +32,10 @@ func handleMsgMhfEnumerateDistItem(s *Session, p mhfpacket.MHFPacket) {
 	pkt := p.(*mhfpacket.MsgMhfEnumerateDistItem)
 
 	bf := byteframe.NewByteFrame()
-	itemDists, _ := s.server.distRepo.List(s.charID, pkt.DistType)
+	itemDists, err := s.server.distRepo.List(s.charID, pkt.DistType)
+	if err != nil {
+		s.logger.Error("Failed to list item distributions", zap.Error(err))
+	}
 
 	bf.WriteUint16(uint16(len(itemDists)))
 	for _, dist := range itemDists {
@@ -108,7 +111,10 @@ func handleMsgMhfApplyDistItem(s *Session, p mhfpacket.MHFPacket) {
 	pkt := p.(*mhfpacket.MsgMhfApplyDistItem)
 	bf := byteframe.NewByteFrame()
 	bf.WriteUint32(pkt.DistributionID)
-	distItems, _ := s.server.distRepo.GetItems(pkt.DistributionID)
+	distItems, err := s.server.distRepo.GetItems(pkt.DistributionID)
+	if err != nil {
+		s.logger.Error("Failed to get distribution items", zap.Error(err))
+	}
 	bf.WriteUint16(uint16(len(distItems)))
 	for _, item := range distItems {
 		bf.WriteUint8(item.ItemType)
@@ -126,7 +132,10 @@ func handleMsgMhfAcquireDistItem(s *Session, p mhfpacket.MHFPacket) {
 	if pkt.DistributionID > 0 {
 		err := s.server.distRepo.RecordAccepted(pkt.DistributionID, s.charID)
 		if err == nil {
-			distItems, _ := s.server.distRepo.GetItems(pkt.DistributionID)
+			distItems, err := s.server.distRepo.GetItems(pkt.DistributionID)
+			if err != nil {
+				s.logger.Error("Failed to get distribution items for acquisition", zap.Error(err))
+			}
 			for _, item := range distItems {
 				switch item.ItemType {
 				case 17:

@@ -27,7 +27,10 @@ func handleMsgMhfOperateGuild(s *Session, p mhfpacket.MHFPacket) {
 
 	switch pkt.Action {
 	case mhfpacket.OperateGuildDisband:
-		result, _ := s.server.guildService.Disband(s.charID, guild.ID)
+		result, err := s.server.guildService.Disband(s.charID, guild.ID)
+		if err != nil {
+			s.logger.Error("Failed to disband guild", zap.Error(err))
+		}
 		response := 0
 		if result != nil && result.Success {
 			response = 1
@@ -46,7 +49,10 @@ func handleMsgMhfOperateGuild(s *Session, p mhfpacket.MHFPacket) {
 			bf.WriteUint32(0)
 		}
 	case mhfpacket.OperateGuildLeave:
-		result, _ := s.server.guildService.Leave(s.charID, guild.ID, characterGuildInfo.IsApplicant, guild.Name)
+		result, err := s.server.guildService.Leave(s.charID, guild.ID, characterGuildInfo.IsApplicant, guild.Name)
+		if err != nil {
+			s.logger.Error("Failed to leave guild", zap.Error(err))
+		}
 		response := 0
 		if result != nil && result.Success {
 			response = 1

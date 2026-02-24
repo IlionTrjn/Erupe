@@ -122,13 +122,19 @@ func handleMsgMhfEnumerateShop(s *Session, p mhfpacket.MHFPacket) {
 	case 2: // Actual gacha
 		bf := byteframe.NewByteFrame()
 		bf.WriteUint32(pkt.ShopID)
-		gachaType, _ := s.server.gachaRepo.GetShopType(pkt.ShopID)
+		gachaType, err := s.server.gachaRepo.GetShopType(pkt.ShopID)
+		if err != nil {
+			s.logger.Error("Failed to get gacha shop type", zap.Error(err))
+		}
 		entries, err := s.server.gachaRepo.GetAllEntries(pkt.ShopID)
 		if err != nil {
 			doAckBufSucceed(s, pkt.AckHandle, make([]byte, 4))
 			return
 		}
-		divisor, _ := s.server.gachaRepo.GetWeightDivisor(pkt.ShopID)
+		divisor, err := s.server.gachaRepo.GetWeightDivisor(pkt.ShopID)
+		if err != nil {
+			s.logger.Error("Failed to get gacha weight divisor", zap.Error(err))
+		}
 		bf.WriteUint16(uint16(len(entries)))
 		for _, ge := range entries {
 			var items []GachaItem
@@ -262,7 +268,10 @@ func handleMsgMhfGetFpointExchangeList(s *Session, p mhfpacket.MHFPacket) {
 	pkt := p.(*mhfpacket.MsgMhfGetFpointExchangeList)
 
 	bf := byteframe.NewByteFrame()
-	exchanges, _ := s.server.shopRepo.GetFpointExchangeList()
+	exchanges, err := s.server.shopRepo.GetFpointExchangeList()
+	if err != nil {
+		s.logger.Error("Failed to get fpoint exchange list", zap.Error(err))
+	}
 	var buyables uint16
 	for _, e := range exchanges {
 		if e.Buyable {

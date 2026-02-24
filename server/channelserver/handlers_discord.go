@@ -31,8 +31,18 @@ func (s *Server) onInteraction(ds *discordgo.Session, i *discordgo.InteractionCr
 			})
 		}
 	case "password":
-		password, _ := bcrypt.GenerateFromPassword([]byte(i.ApplicationCommandData().Options[0].StringValue()), 10)
-		err := s.userRepo.SetPasswordByDiscordID(i.Member.User.ID, password)
+		password, err := bcrypt.GenerateFromPassword([]byte(i.ApplicationCommandData().Options[0].StringValue()), 10)
+		if err != nil {
+			_ = ds.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Failed to hash password.",
+					Flags:   discordgo.MessageFlagsEphemeral,
+				},
+			})
+			return
+		}
+		err = s.userRepo.SetPasswordByDiscordID(i.Member.User.ID, password)
 		if err == nil {
 			_ = ds.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
