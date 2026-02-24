@@ -28,8 +28,7 @@ func (r *ShopRepository) GetShopItems(shopType uint8, shopID uint32, charID uint
 func (r *ShopRepository) RecordPurchase(charID, shopItemID, quantity uint32) error {
 	_, err := r.db.Exec(`INSERT INTO shop_items_bought (character_id, shop_item_id, bought)
 		VALUES ($1,$2,$3) ON CONFLICT (character_id, shop_item_id)
-		DO UPDATE SET bought = bought + $3
-		WHERE EXCLUDED.character_id=$1 AND EXCLUDED.shop_item_id=$2
+		DO UPDATE SET bought = shop_items_bought.bought + $3
 	`, charID, shopItemID, quantity)
 	return err
 }

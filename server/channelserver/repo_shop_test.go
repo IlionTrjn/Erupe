@@ -57,14 +57,32 @@ func TestRepoShopGetShopItems(t *testing.T) {
 	}
 }
 
-func TestRepoShopRecordPurchaseAmbiguousColumn(t *testing.T) {
-	repo, _, charID := setupShopRepo(t)
+func TestRepoShopRecordPurchaseInsertAndUpdate(t *testing.T) {
+	repo, db, charID := setupShopRepo(t)
 
-	// RecordPurchase uses ON CONFLICT with unqualified "bought" column reference,
-	// which PostgreSQL rejects as ambiguous. This test documents the existing bug.
-	err := repo.RecordPurchase(charID, 1, 3)
-	if err == nil {
-		t.Fatal("Expected error from ambiguous column reference in RecordPurchase SQL, but got nil")
+	// First purchase inserts a new row
+	if err := repo.RecordPurchase(charID, 1, 3); err != nil {
+		t.Fatalf("RecordPurchase (insert) failed: %v", err)
+	}
+
+	var bought int
+	if err := db.QueryRow("SELECT bought FROM shop_items_bought WHERE character_id=$1 AND shop_item_id=$2", charID, 1).Scan(&bought); err != nil {
+		t.Fatalf("Verification query failed: %v", err)
+	}
+	if bought != 3 {
+		t.Errorf("Expected bought=3, got: %d", bought)
+	}
+
+	// Second purchase updates (adds to) the existing row
+	if err := repo.RecordPurchase(charID, 1, 2); err != nil {
+		t.Fatalf("RecordPurchase (update) failed: %v", err)
+	}
+
+	if err := db.QueryRow("SELECT bought FROM shop_items_bought WHERE character_id=$1 AND shop_item_id=$2", charID, 1).Scan(&bought); err != nil {
+		t.Fatalf("Verification query failed: %v", err)
+	}
+	if bought != 5 {
+		t.Errorf("Expected bought=5 (3+2), got: %d", bought)
 	}
 }
 

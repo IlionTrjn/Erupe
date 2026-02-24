@@ -1220,6 +1220,9 @@ CREATE TABLE public.shop_items_bought (
     bought integer
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS shop_items_bought_character_item_unique
+    ON public.shop_items_bought (character_id, shop_item_id);
+
 
 --
 -- Name: shop_items_id_seq; Type: SEQUENCE; Schema: public; Owner: -
