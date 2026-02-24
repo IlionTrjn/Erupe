@@ -1007,10 +1007,23 @@ type mockFestaRepo struct {
 	hasClaimed  bool
 	prizes      []Prize
 	prizesErr   error
+
+	cleanupErr     error
+	cleanupCalled  bool
+	insertErr      error
+	insertedStart  uint32
+	submitErr      error
+	submittedSouls []uint16
 }
 
-func (m *mockFestaRepo) CleanupAll() error                          { return nil }
-func (m *mockFestaRepo) InsertEvent(_ uint32) error                 { return nil }
+func (m *mockFestaRepo) CleanupAll() error {
+	m.cleanupCalled = true
+	return m.cleanupErr
+}
+func (m *mockFestaRepo) InsertEvent(start uint32) error {
+	m.insertedStart = start
+	return m.insertErr
+}
 func (m *mockFestaRepo) GetFestaEvents() ([]FestaEvent, error)     { return m.events, m.eventsErr }
 func (m *mockFestaRepo) GetTeamSouls(_ string) (uint32, error)     { return m.teamSouls, m.teamErr }
 func (m *mockFestaRepo) GetTrialsWithMonopoly() ([]FestaTrial, error) {
@@ -1026,7 +1039,10 @@ func (m *mockFestaRepo) GetCharSouls(_ uint32) (uint32, error)      { return m.c
 func (m *mockFestaRepo) HasClaimedMainPrize(_ uint32) bool           { return m.hasClaimed }
 func (m *mockFestaRepo) VoteTrial(_ uint32, _ uint32) error          { return nil }
 func (m *mockFestaRepo) RegisterGuild(_ uint32, _ string) error      { return nil }
-func (m *mockFestaRepo) SubmitSouls(_, _ uint32, _ []uint16) error   { return nil }
+func (m *mockFestaRepo) SubmitSouls(_, _ uint32, souls []uint16) error {
+	m.submittedSouls = souls
+	return m.submitErr
+}
 func (m *mockFestaRepo) ClaimPrize(_ uint32, _ uint32) error         { return nil }
 func (m *mockFestaRepo) ListPrizes(_ uint32, _ string) ([]Prize, error) {
 	return m.prizes, m.prizesErr

@@ -76,6 +76,7 @@ type Server struct {
 	achievementService *AchievementService
 	gachaService       *GachaService
 	towerService       *TowerService
+	festaService       *FestaService
 	erupeConfig        *cfg.Config
 	acceptConns        chan net.Conn
 	deleteConns        chan net.Conn
@@ -163,6 +164,7 @@ func NewServer(config *Config) *Server {
 	s.achievementService = NewAchievementService(s.achievementRepo, s.logger)
 	s.gachaService = NewGachaService(s.gachaRepo, s.userRepo, s.charRepo, s.logger, config.ErupeConfig.GameplayOptions.MaximumNP)
 	s.towerService = NewTowerService(s.towerRepo, s.logger)
+	s.festaService = NewFestaService(s.festaRepo, s.logger)
 
 	// Mezeporta
 	s.stages.Store("sl1Ns200p0a0u0", NewStage("sl1Ns200p0a0u0"))

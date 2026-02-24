@@ -181,6 +181,7 @@ func (r *FestaRepository) RegisterGuild(guildID uint32, team string) error {
 }
 
 // SubmitSouls records soul submissions for a character within a transaction.
+// All entries are inserted; callers should pre-filter zero values.
 func (r *FestaRepository) SubmitSouls(charID, guildID uint32, souls []uint16) error {
 	tx, err := r.db.BeginTxx(context.Background(), nil)
 	if err != nil {
@@ -189,9 +190,6 @@ func (r *FestaRepository) SubmitSouls(charID, guildID uint32, souls []uint16) er
 	defer func() { _ = tx.Rollback() }()
 
 	for i, s := range souls {
-		if s == 0 {
-			continue
-		}
 		if _, err := tx.Exec(`INSERT INTO festa_submissions VALUES ($1, $2, $3, $4, now())`, charID, guildID, i, s); err != nil {
 			return err
 		}

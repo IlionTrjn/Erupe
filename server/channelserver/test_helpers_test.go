@@ -83,6 +83,11 @@ func ensureTowerService(s *Server) {
 	s.towerService = NewTowerService(s.towerRepo, s.logger)
 }
 
+// ensureFestaService wires the FestaService from the server's current repos.
+func ensureFestaService(s *Server) {
+	s.festaService = NewFestaService(s.festaRepo, s.logger)
+}
+
 // createMockSession creates a minimal Session for testing.
 // Imported from v9.2.x-stable and adapted for main.
 func createMockSession(charID uint32, server *Server) *Session {

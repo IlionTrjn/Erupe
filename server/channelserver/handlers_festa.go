@@ -85,12 +85,6 @@ func handleMsgMhfEnumerateRanking(s *Session, p mhfpacket.MHFPacket) {
 	doAckBufSucceed(s, pkt.AckHandle, bf.Data())
 }
 
-func cleanupFesta(s *Session) {
-	if err := s.server.festaRepo.CleanupAll(); err != nil {
-		s.logger.Error("Failed to cleanup festa", zap.Error(err))
-	}
-}
-
 // Festa timing constants (all values in seconds)
 const (
 	festaVotingDuration = 9000    // 150 min voting window
@@ -125,13 +119,10 @@ func generateFestaTimestamps(s *Session, start uint32, debug bool) []uint32 {
 		}
 		return timestamps
 	}
-	if start == 0 || TimeAdjusted().Unix() > int64(start)+festaEventLifespan {
-		cleanupFesta(s)
-		// Generate a new festa, starting midnight tomorrow
-		start = uint32(midnight.Add(24 * time.Hour).Unix())
-		if err := s.server.festaRepo.InsertEvent(start); err != nil {
-			s.logger.Error("Failed to insert festa event", zap.Error(err))
-		}
+	var err error
+	start, err = s.server.festaService.EnsureActiveEvent(start, TimeAdjusted(), midnight.Add(24*time.Hour))
+	if err != nil {
+		s.logger.Error("Failed to ensure active festa event", zap.Error(err))
 	}
 	timestamps[0] = start
 	timestamps[1] = timestamps[0] + secsPerWeek
@@ -461,7 +452,7 @@ func handleMsgMhfEntryFesta(s *Session, p mhfpacket.MHFPacket) {
 
 func handleMsgMhfChargeFesta(s *Session, p mhfpacket.MHFPacket) {
 	pkt := p.(*mhfpacket.MsgMhfChargeFesta)
-	if err := s.server.festaRepo.SubmitSouls(s.charID, pkt.GuildID, pkt.Souls); err != nil {
+	if err := s.server.festaService.SubmitSouls(s.charID, pkt.GuildID, pkt.Souls); err != nil {
 		s.logger.Error("Failed to submit festa souls", zap.Error(err))
 	}
 	doAckSimpleSucceed(s, pkt.AckHandle, make([]byte, 4))
