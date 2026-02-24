@@ -237,7 +237,11 @@ func parseChatCommand(s *Session, command string) {
 						sendServerChatMessage(s, fmt.Sprintf(s.server.i18n.commands.kqf.get, s.kqf))
 					case "set":
 						if len(args) > 2 && len(args[2]) == 16 {
-							hexd, _ := hex.DecodeString(args[2])
+							hexd, err := hex.DecodeString(args[2])
+							if err != nil {
+								sendServerChatMessage(s, fmt.Sprintf(s.server.i18n.commands.kqf.set.error, commands["KeyQuest"].Prefix))
+								return
+							}
 							s.kqf = hexd
 							s.kqfOverride = true
 							sendServerChatMessage(s, s.server.i18n.commands.kqf.set.success)
@@ -253,8 +257,12 @@ func parseChatCommand(s *Session, command string) {
 	case commands["Rights"].Prefix:
 		if commands["Rights"].Enabled || s.isOp() {
 			if len(args) > 1 {
-				v, _ := strconv.Atoi(args[1])
-				err := s.server.userRepo.SetRights(s.userID, uint32(v))
+				v, err := strconv.Atoi(args[1])
+				if err != nil {
+					sendServerChatMessage(s, fmt.Sprintf(s.server.i18n.commands.rights.error, commands["Rights"].Prefix))
+					return
+				}
+				err = s.server.userRepo.SetRights(s.userID, uint32(v))
 				if err == nil {
 					sendServerChatMessage(s, fmt.Sprintf(s.server.i18n.commands.rights.success, v))
 				} else {
@@ -365,8 +373,16 @@ func parseChatCommand(s *Session, command string) {
 	case commands["Teleport"].Prefix:
 		if commands["Teleport"].Enabled || s.isOp() {
 			if len(args) > 2 {
-				x, _ := strconv.ParseInt(args[1], 10, 16)
-				y, _ := strconv.ParseInt(args[2], 10, 16)
+				x, err := strconv.ParseInt(args[1], 10, 16)
+				if err != nil {
+					sendServerChatMessage(s, fmt.Sprintf(s.server.i18n.commands.teleport.error, commands["Teleport"].Prefix))
+					return
+				}
+				y, err := strconv.ParseInt(args[2], 10, 16)
+				if err != nil {
+					sendServerChatMessage(s, fmt.Sprintf(s.server.i18n.commands.teleport.error, commands["Teleport"].Prefix))
+					return
+				}
 				payload := byteframe.NewByteFrame()
 				payload.SetLE()
 				payload.WriteUint8(2)        // SetState type(position == 2)

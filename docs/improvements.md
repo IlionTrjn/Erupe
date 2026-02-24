@@ -71,7 +71,11 @@ From `technical-debt.md`: `model_character.go:88,101,113` has `TODO: fix bookshe
 
 **Fix:** On parse error, send a chat message back to the player explaining the expected format, then return early. Each command's branch already has access to the session for sending messages.
 
-**Status:** Pending.
+**Status:** **Done.** All 4 sites now validate parse results and send the existing i18n error messages:
+
+- `hex.DecodeString` (KeyQuest set) — sends kqf.set.error on invalid hex
+- `strconv.Atoi` (Rights) — sends rights.error on non-integer
+- `strconv.ParseInt` x/y (Teleport) — sends teleport.error on non-integer coords
 
 ---
 
