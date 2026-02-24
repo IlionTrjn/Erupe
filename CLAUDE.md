@@ -51,16 +51,29 @@ Handler signature: `func(s *Session, p mhfpacket.MHFPacket)`
 
 ```
 handlers_*.go  →  svc_*.go (service layer)  →  repo_*.go (data access)
-                                                    ↓
+                  (where needed)                     ↓
                                               repo_interfaces.go (21 interfaces)
                                                     ↓
                                               repo_mocks_test.go (test doubles)
 ```
 
-- **Handlers**: Parse packets, call services/repos, build responses. Must always send ACK (see Error Handling below).
-- **Services** (`svc_guild.go`, etc.): Business logic extracted from handlers. New domain logic should go here.
+- **Handlers**: Parse packets, call services or repos, build responses. Must always send ACK (see Error Handling below). Simple CRUD operations call repos directly; multi-step or cross-repo logic goes through services.
+- **Services**: Encapsulate business logic that spans multiple repos or requires orchestration beyond simple CRUD. Not a mandatory pass-through — handlers call repos directly for straightforward data access.
 - **Repositories**: All SQL lives in `repo_*.go` files behind interfaces in `repo_interfaces.go`. The `Server` struct holds interface types, not concrete implementations. Handler code must never contain inline SQL.
 - **Sign server** has its own repo pattern: 3 interfaces in `server/signserver/repo_interfaces.go`.
+
+#### Services
+
+| Service | File | Methods | Purpose |
+|---------|------|---------|---------|
+| `GuildService` | `svc_guild.go` | 6 | Member operations, disband, resign, leave, scout — triggers cross-repo mail |
+| `MailService` | `svc_mail.go` | 4 | Send/broadcast mail with message type routing |
+| `GachaService` | `svc_gacha.go` | 6 | Gacha rolls (normal/stepup/box), point transactions, reward resolution |
+| `AchievementService` | `svc_achievement.go` | 2 | Achievement fetch with score computation, increment |
+| `TowerService` | `svc_tower.go` | 3 | Tower gem management, tenrourai progress capping, guild RP donation |
+| `FestaService` | `svc_festa.go` | 2 | Event lifecycle (expiry/cleanup/creation), soul submission filtering |
+
+Each service takes repo interfaces + `*zap.Logger` in its constructor, making it testable with mocks. Tests live in `svc_*_test.go` files alongside the service.
 
 ### Key Subsystems
 
@@ -123,6 +136,17 @@ The MHF client expects `MsgSysAck` for most requests. Missing ACKs cause client 
 1. Add method signature to the relevant interface in `repo_interfaces.go`
 2. Implement in the corresponding `repo_*.go` file
 3. Add mock implementation in `repo_mocks_test.go`
+
+## Adding Business Logic
+
+If the new logic involves multi-step orchestration, cross-repo coordination, or non-trivial data transformation:
+
+1. Add or extend a service in the appropriate `svc_*.go` file
+2. Wire it in `sys_channel_server.go` (constructor + field on `Server` struct)
+3. Add tests in `svc_*_test.go` using mock repos
+4. Call the service from the handler instead of the repo directly
+
+Simple CRUD operations should stay as direct repo calls from handlers — not everything needs a service.
 
 ## Known Issues
 

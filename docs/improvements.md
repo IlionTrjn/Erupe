@@ -92,7 +92,11 @@ This isn't necessarily wrong — the services exist for multi-repo coordination,
 
 **Fix:** Update the architecture diagram in `CLAUDE.md` to reflect the actual pattern: services are used for cross-repo coordination, handlers call repos directly for simple CRUD. Remove the implication that all handlers go through services. Alternatively, expand service coverage to match the documented architecture, but that is a much larger effort with diminishing returns.
 
-**Status:** Pending.
+**Status:** **Done.** Updated three files:
+
+- `Erupe/CLAUDE.md` — Layered architecture diagram clarified ("where needed"), handler description updated to explain when to use services vs direct repo calls, added services table listing all 6 services with method counts and purpose, added "Adding Business Logic" section with guidelines
+- `server/CLAUDE.md` — Repository Pattern section renamed to "Repository & Service Pattern", added service layer summary with the 6 services listed
+- `docs/improvements.md` — This item marked as done
 
 ---
 
