@@ -243,6 +243,89 @@ func CreateTestGuild(t *testing.T, db *sqlx.DB, leaderCharID uint32, name string
 	return guildID
 }
 
+// CreateTestSignSession creates a sign session and returns the session ID.
+func CreateTestSignSession(t *testing.T, db *sqlx.DB, userID uint32, token string) uint32 {
+	t.Helper()
+
+	var id uint32
+	err := db.QueryRow(
+		`INSERT INTO sign_sessions (user_id, token) VALUES ($1, $2) RETURNING id`,
+		userID, token,
+	).Scan(&id)
+	if err != nil {
+		t.Fatalf("Failed to create test sign session: %v", err)
+	}
+	return id
+}
+
+// CreateTestServer creates a server entry for testing.
+func CreateTestServer(t *testing.T, db *sqlx.DB, serverID uint16) {
+	t.Helper()
+
+	_, err := db.Exec(
+		`INSERT INTO servers (server_id, current_players) VALUES ($1, 0)`,
+		serverID,
+	)
+	if err != nil {
+		t.Fatalf("Failed to create test server: %v", err)
+	}
+}
+
+// CreateTestUserBinary creates a user_binary row for the given character ID.
+func CreateTestUserBinary(t *testing.T, db *sqlx.DB, charID uint32) {
+	t.Helper()
+
+	_, err := db.Exec(`INSERT INTO user_binary (id) VALUES ($1)`, charID)
+	if err != nil {
+		t.Fatalf("Failed to create test user_binary: %v", err)
+	}
+}
+
+// CreateTestGachaShop creates a gacha shop entry and returns its ID.
+func CreateTestGachaShop(t *testing.T, db *sqlx.DB, name string, gachaType int) uint32 {
+	t.Helper()
+
+	var id uint32
+	err := db.QueryRow(
+		`INSERT INTO gacha_shop (name, gacha_type, min_gr, min_hr, url_banner, url_feature, url_thumbnail, wide, recommended, hidden)
+		VALUES ($1, $2, 0, 0, '', '', '', false, false, false) RETURNING id`,
+		name, gachaType,
+	).Scan(&id)
+	if err != nil {
+		t.Fatalf("Failed to create test gacha shop: %v", err)
+	}
+	return id
+}
+
+// CreateTestGachaEntry creates a gacha entry and returns its ID.
+func CreateTestGachaEntry(t *testing.T, db *sqlx.DB, gachaID uint32, entryType int, weight int) uint32 {
+	t.Helper()
+
+	var id uint32
+	err := db.QueryRow(
+		`INSERT INTO gacha_entries (gacha_id, entry_type, weight, rarity, item_type, item_number, item_quantity, rolls, frontier_points, daily_limit)
+		VALUES ($1, $2, $3, 1, 0, 0, 0, 1, 0, 0) RETURNING id`,
+		gachaID, entryType, weight,
+	).Scan(&id)
+	if err != nil {
+		t.Fatalf("Failed to create test gacha entry: %v", err)
+	}
+	return id
+}
+
+// CreateTestGachaItem creates a gacha item for an entry.
+func CreateTestGachaItem(t *testing.T, db *sqlx.DB, entryID uint32, itemType uint8, itemID uint16, quantity uint16) {
+	t.Helper()
+
+	_, err := db.Exec(
+		`INSERT INTO gacha_items (entry_id, item_type, item_id, quantity) VALUES ($1, $2, $3, $4)`,
+		entryID, itemType, itemID, quantity,
+	)
+	if err != nil {
+		t.Fatalf("Failed to create test gacha item: %v", err)
+	}
+}
+
 // SetTestDB assigns a database to a Server and initializes all repositories.
 // Use this in integration tests instead of setting s.server.db directly.
 func SetTestDB(s *Server, db *sqlx.DB) {

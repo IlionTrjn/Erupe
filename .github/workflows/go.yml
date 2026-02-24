@@ -29,6 +29,22 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: erupe_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 10
+          --mount type=tmpfs,destination=/var/lib/postgresql/data
+
     steps:
     - uses: actions/checkout@v4
 
@@ -42,6 +58,12 @@ jobs:
 
     - name: Run Tests with Race Detector and Coverage
       run: go test -race -coverprofile=coverage.out ./... -timeout=10m
+      env:
+        TEST_DB_HOST: localhost
+        TEST_DB_PORT: 5433
+        TEST_DB_USER: test
+        TEST_DB_PASSWORD: test
+        TEST_DB_NAME: erupe_test
 
     - name: Check coverage threshold
       run: |
